@@ -1,0 +1,12 @@
+{
+  "accessibility.signals.chatResponseReceived": {
+    "sound": "off"
+  },
+  "accessibility.signals.lineHasError": {
+    "announcement": "off"
+  },
+  "accessibility.signals.lineHasWarning": {
+    "announcement": "off",
+    "sound": "off"
+  }
+}
