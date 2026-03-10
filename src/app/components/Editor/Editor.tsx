@@ -4,7 +4,7 @@ import { BubbleMenu } from '@tiptap/react/menus'; // 气泡菜单组件
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu'; // 气泡菜单扩展
 import StarterKit from '@tiptap/starter-kit';
 import { Bold, Italic } from "lucide-react";
-
+import { useRef } from 'react';
 const Editor = () => {
   const editor = useEditor({
     extensions: [
