@@ -1,4 +1,8 @@
+"use client";
+import Link from "next/link";
+
 export default function NovelsPage() {
+  
   return (
     <div className="space-y-8">
       {/* 页面标题和操作按钮 */}
@@ -8,9 +12,12 @@ export default function NovelsPage() {
           <p className="text-gray-600 mt-2">管理你的所有小说作品</p>
         </div>
         
-        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+        <Link 
+          href="/editor" 
+          className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md"
+        >
           新建小说
-        </button>
+        </Link>
       </div>
 
       {/* 搜索和筛选区域 */}
@@ -56,7 +63,7 @@ export default function NovelsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* 小说卡片 1 */}
         <div className="bg-white rounded-xl shadow-lg border border-blue-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-          <div className="h-40 bg-gradient-to-r from-blue-500 to-purple-600 relative">
+          <div className="h-40 bg-linear-to-r from-blue-500 to-purple-600 relative">
             <div className="absolute top-4 right-4">
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                 连载中
@@ -94,13 +101,13 @@ export default function NovelsPage() {
 
             {/* 操作按钮 */}
             <div className="flex gap-2">
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all">
+              <button className="flex-1 px-4 py-2 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all">
                 查看
               </button>
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all">
+              <button className="flex-1 px-4 py-2 bg-linear-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all">
                 编辑
               </button>
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all">
+              <button className="flex-1 px-4 py-2 bg-linear-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all">
                 删除
               </button>
             </div>
@@ -109,7 +116,7 @@ export default function NovelsPage() {
 
         {/* 小说卡片 2 */}
         <div className="bg-white rounded-xl shadow-lg border border-blue-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-          <div className="h-40 bg-gradient-to-r from-green-500 to-teal-600 relative">
+          <div className="h-40 bg-linear-to-r from-green-500 to-teal-600 relative">
             <div className="absolute top-4 right-4">
               <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                 已完结
@@ -147,13 +154,13 @@ export default function NovelsPage() {
 
             {/* 操作按钮 */}
             <div className="flex gap-2">
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all">
+              <button className="flex-1 px-4 py-2 bglinear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all">
                 查看
               </button>
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all">
+              <button className="flex-1 px-4 py-2 bglinear-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all">
                 编辑
               </button>
-              <button className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all">
+              <button className="flex-1 px-4 py-2 bg-linear-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all">
                 删除
               </button>
             </div>
@@ -161,7 +168,7 @@ export default function NovelsPage() {
         </div>
 
         {/* 空卡片 - 用于新建 */}
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-dashed border-blue-300 overflow-hidden hover:border-blue-400 transition-colors duration-300">
+        <div className="bg-linear-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-dashed border-blue-300 overflow-hidden hover:border-blue-400 transition-colors duration-300">
           <div className="h-40 flex items-center justify-center">
             <div className="text-center">
               <div className="text-4xl text-blue-400 mb-2">+</div>
@@ -175,15 +182,15 @@ export default function NovelsPage() {
               点击这里开始创作你的下一部小说作品
             </p>
             
-            <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+            <Link href="/editor" className="w-full px-4 py-3 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
               创建新小说
-            </button>
+            </Link>
           </div>
         </div>
       </div>
 
       {/* 统计信息 */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-8">
+      <div className="bg-linear-to-r from-blue-50 to-blue-100 rounded-2xl p-8">
         <h3 className="text-xl font-bold text-gray-900 mb-6">创作统计</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm text-center">

@@ -8,9 +8,9 @@ const Navbar = () => {
   const pathname = usePathname();
 
   const navItems = [
-    { name: "首页", href: "/", icon: <Home size={20} /> },
-    { name: "编辑器", href: "/editor", icon: <Edit size={20} /> },
-    { name: "小说列表", href: "/novels", icon: <List size={20} /> },
+    { name: "首页", href: "/", icon: <Home size={20} />, id: "home"},
+    { name: "编辑器", href: "/editor", icon: <Edit size={20} />, id: "editor" },
+    { name: "小说列表", href: "/novels", icon: <List size={20} />, id: "novels"},
   ];
 
   return (
@@ -26,7 +26,7 @@ const Navbar = () => {
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
-               <Link href={item.href}> {item.name}
+               <Link href={item.href} key={item.id}  id={`nav-link-${item.id}`}> {item.name}
                </Link>
               );
             })}

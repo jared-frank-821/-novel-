@@ -1,0 +1,4 @@
+{"sessionId":"1a3613","location":"completion/route.ts","message":"POST /api/completion called","data":{"hasBody":true},"hypothesisId":"K","timestamp":1773289213321}
+{"sessionId":"1a3613","location":"completion/route.ts","message":"prompt received","data":{"promptLength":4,"promptPreview":"测试连接"},"hypothesisId":"L","timestamp":1773289213325}
+{"sessionId":"1a3613","location":"completion/route.ts","message":"env vars check","data":{"hasApiKey":true,"hasBaseUrl":true,"baseUrl":"https://dashscope.aliyuncs.com/compatible-mode/v1"},"hypothesisId":"M","timestamp":1773289213326}
+{"sessionId":"1a3613","location":"completion/route.ts","message":"streamText result created","data":{"success":true},"hypothesisId":"N","timestamp":1773289213333}

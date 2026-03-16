@@ -1,0 +1,17 @@
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":""},"hypothesisId":"A","timestamp":1773289213067}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"completion changed","data":{"completion":""},"hypothesisId":"B","timestamp":1773289213068}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"checking API connection","data":{},"hypothesisId":"C","timestamp":1773289213069}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"API response status","data":{"status":200,"ok":true},"hypothesisId":"D","timestamp":1773289213993}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"API connected successfully","data":{},"hypothesisId":"E","timestamp":1773289213994}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"c"},"hypothesisId":"A","timestamp":1773289217942}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"ch"},"hypothesisId":"A","timestamp":1773289218030}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"chu"},"hypothesisId":"A","timestamp":1773289218134}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"ch"},"hypothesisId":"A","timestamp":1773289218575}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"c"},"hypothesisId":"A","timestamp":1773289218759}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":""},"hypothesisId":"A","timestamp":1773289218920}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天"},"hypothesisId":"A","timestamp":1773289221326}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天的"},"hypothesisId":"A","timestamp":1773289221960}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天的花朵"},"hypothesisId":"A","timestamp":1773289223394}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天的花朵正在"},"hypothesisId":"A","timestamp":1773289225066}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天的花朵正在阳光"},"hypothesisId":"A","timestamp":1773289226386}
+{"sessionId":"1a3613","location":"try/page.tsx","message":"input changed","data":{"input":"春天的花朵正在阳光\n"},"hypothesisId":"A","timestamp":1773289226754}

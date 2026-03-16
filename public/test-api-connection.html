@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #0070f3;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .checking {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+        }
+        .connected {
+            background-color: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffebee;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        .no-key {
+            background-color: #fff3e0;
+            border: 1px solid #ff9800;
+            color: #ef6c00;
+        }
+        button {
+            background-color: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0051a8;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+        }
+        .details {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API连接测试</h1>
+        
+        <div id="status" class="status checking">
+            正在检测API连接...
+        </div>
+        
+        <div id="details" class="details" style="display: none;">
+            <h3>测试详情：</h3>
+            <pre id="response"></pre>
+        </div>
+        
+        <button onclick="testConnection()">测试连接</button>
+        <button onclick="window.location.href='http://localhost:3001/try'">访问Try页面</button>
+        
+        <div style="margin-top: 30px;">
+            <h3>环境变量配置：</h3>
+            <pre>DEEPSEEK_API_KEY=你的DeepSeek API密钥
+BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1</pre>
+            <p>确保以上内容已添加到项目根目录的 <code>.env.local</code> 文件中</p>
+        </div>
+    </div>
+
+    <script>
+        async function testConnection() {
+            const statusEl = document.getElementById('status');
+            const detailsEl = document.getElementById('details');
+            const responseEl = document.getElementById('response');
+            
+            statusEl.className = 'status checking';
+            statusEl.textContent = '正在检测API连接...';
+            detailsEl.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/completion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: '测试连接' }),
+                });
+
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    statusEl.className = 'status connected';
+                    statusEl.textContent = '✅ API连接正常！可以开始使用AI续写功能。';
+                    
+                    responseEl.textContent = `状态码: ${response.status}\n响应内容: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`;
+                    detailsEl.style.display = 'block';
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `❌ API连接失败: ${response.status} ${response.statusText}`;
+                    
+                    responseEl.textContent = `状态码: ${response.status}\n状态文本: ${response.statusText}\n响应内容: ${responseText}`;
+                    detailsEl.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('API连接检测失败:', error);
+                
+                if (error.message?.includes('API key') || error.message?.includes('environment variable')) {
+                    statusEl.className = 'status no-key';
+                    statusEl.textContent = '⚠️ 缺少API密钥。请检查.env.local文件是否包含DEEPSEEK_API_KEY和BASE_URL。';
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `❌ 连接错误: ${error.message || '无法连接到服务器'}`;
+                }
+                
+                responseEl.textContent = `错误类型: ${error.name}\n错误信息: ${error.message}\n完整错误: ${error.stack}`;
+                detailsEl.style.display = 'block';
+            }
+        }
+
+        // 页面加载时自动测试
+        window.onload = testConnection;
+    </script>
+</body>
+</html>

@@ -1,151 +1,61 @@
 "use client";
 
-import dynamic from 'next/dynamic';
-import { Save, Download, Upload, X } from "lucide-react";
-import { useState } from "react";
-
-// 动态导入编辑器组件
-const Editor = dynamic(() => import('../components/Editor/Editor'), {
-  ssr: false,
-  loading: () => <div className="text-center py-12">编辑器加载中...</div>
-});
+import { FileStack, BookmarkPlus } from "lucide-react";
 
 export default function EditorPage() {
-  const [title, setTitle] = useState("新小说");
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [fileName, setFileName] = useState("");
-
-  const handleSave = () => {
-    if (fileName.trim()) {
-      alert(`小说 "${fileName}" 已保存！`);
-      setShowSaveModal(false);
-      setFileName("");
-    }
-  };
-
   return (
-    <div className="space-y-8">
-      {/* 页面标题和操作按钮 */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">小说编辑器</h1>
-          <p className="text-gray-600 mt-2">开始创作你的故事，支持实时保存和格式编辑</p>
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md"
-          >
-            <Save size={18} />
-            保存作品
-          </button>
-          
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md">
-            <Download size={18} />
-            导出
-          </button>
-          
-          <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-md">
-            <Upload size={18} />
-            导入
-          </button>
-        </div>
+    <div className="space-y-10">
+      {/* 页面标题 */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">小说写作</h1>
+        <p className="text-gray-600 mt-2">选择创作类型，开始你的故事</p>
       </div>
 
-      {/* 小说标题输入 */}
-      <div className="bg-white p-6 rounded-xl shadow-md border border-blue-100">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          小说标题
-        </label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          placeholder="请输入小说标题..."
-        />
-      </div>
-
-      {/* 编辑器区域 */}
-      <div className="bg-white rounded-xl shadow-lg border border-blue-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-          <h2 className="text-lg font-semibold text-gray-900">编辑区域</h2>
-          <p className="text-sm text-gray-600">使用气泡菜单进行格式编辑，内容自动保存</p>
-        </div>
-        <div className="p-6">
-          <Editor />
-        </div>
-      </div>
-
-      {/* 保存模态框 */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">保存作品</h3>
+      {/* 新的创作 */}
+      <section>
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">新的创作</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+          {/* 长篇小说 */}
+          <article className="group relative flex items-start gap-5 p-6 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-linear-to-b from-emerald-200 to-emerald-100" />
+            <div className="shrink-0 w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <FileStack className="size-7 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">长篇小说</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                多章节小说，情节连贯连载更新
+              </p>
               <button
-                onClick={() => setShowSaveModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                type="button"
+                className="mt-4 px-4 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
               >
-                <X size={20} />
+                开始创作
               </button>
             </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  作品名称
-                </label>
-                <input
-                  type="text"
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="请输入作品名称..."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  描述（可选）
-                </label>
-                <textarea
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  rows={3}
-                  placeholder="添加作品描述..."
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
-              >
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </article>
 
-      {/* 提示信息 */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-2">使用提示</h3>
-        <ul className="space-y-2 text-blue-700">
-          <li>• 选中文本会出现气泡菜单，可进行加粗、斜体等格式编辑</li>
-          <li>• 内容会自动保存到本地存储</li>
-          <li>• 使用快捷键 Ctrl+S 快速保存</li>
-          <li>• 支持导出为多种格式（JSON、HTML、纯文本）</li>
-        </ul>
-      </div>
+          {/* 短篇小说 */}
+          <article className="group relative flex items-start gap-5 p-6 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-linear-to-b from-sky-200 to-sky-100" />
+            <div className="shrink-0 w-14 h-14 rounded-xl bg-sky-100 flex items-center justify-center">
+              <BookmarkPlus className="size-7 text-sky-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">短篇小说</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                两万字以内的短篇故事，情节简单节奏快
+              </p>
+              <button
+                type="button"
+                className="mt-4 px-4 py-2 text-sm font-medium text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+              >
+                开始创作
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
     </div>
   );
 }
