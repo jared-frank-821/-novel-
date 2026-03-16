@@ -22,7 +22,7 @@ import {
   Upload,
   Info,
   Tag,
-  BookOpen,
+  BookOpen, 
   Users,
   FileText,
   Inbox,
@@ -30,9 +30,24 @@ import {
   MessageCircle,
   Lightbulb,
 } from 'lucide-react';
+import { toast } from "sonner"
+import { Toaster } from "@/components/ui/sonner";
+// import { Button } from "@/components/ui/button"
+import  useNovelListStore  from '@/store/useNovelListStore';
 
 export default function TextCompletionPage() {
-  const [input, setInput] = useState('');
+  const { 
+    novelList, 
+    currentChapterIndex, 
+    selectChapter, 
+    updateChapterText 
+  } = useNovelListStore();
+
+  // 获取当前选中的章节内容
+  const currentChapter = novelList.find(c => c.index === currentChapterIndex);
+  const content = currentChapter?.text || '';
+  
+  // const [input, setInput] = useState('');
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [rightPanelInput, setRightPanelInput] = useState('');
@@ -42,7 +57,8 @@ export default function TextCompletionPage() {
 
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error' | 'no-key'>('checking');
   const [apiMessage, setApiMessage] = useState('正在检测API连接...');
-
+//   const [promptTextIndex, setPromptTextIndex] = useState(0);
+// const [promptTextList, setPromptTextList] = useState<{index: number; text: string}[]>([]);
   useEffect(() => {
     const checkApiConnection = async () => {
       try {
@@ -107,15 +123,31 @@ export default function TextCompletionPage() {
     }
   };
 
-  const handleFillBody = () => runCompletion(input);
+  const handleFillBody = () => runCompletion(content);
   const handleRightSend = () => {
     runCompletion(rightPanelInput);
     setRightPanelInput('');
   };
 
-  const wordCount = (input + completion).replace(/\s/g, '').length;
+  const wordCount = (content + completion).replace(/\s/g, '').length;
 
+  const handleSaveArticle = () => {
+    if (currentChapterIndex > 0) {
+      updateChapterText(currentChapterIndex, content);
+      toast.success("保存成功！");
+    } else {
+      toast.error("请先选择或创建一个章节");
+    }
+  };
+
+  // 处理文本内容变化
+  const handleContentChange = (newContent: string) => {
+    if (currentChapterIndex > 0) {
+      updateChapterText(currentChapterIndex, newContent);
+    }
+  };
   return (
+    <>
     <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* 顶栏 */}
       <header className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50 shrink-0">
@@ -125,10 +157,12 @@ export default function TextCompletionPage() {
           </button>
           <span className="text-sm text-gray-500">已保存到云端</span>
           <span className="text-sm text-gray-600">
-            本章字数: {input.replace(/\s/g, '').length} 总字数: {wordCount}
+            本章字数: {content.replace(/\s/g, '').length} 总字数: {wordCount}
           </span>
           <Info className="size-4 text-gray-400" />
+          <Toaster />  
         </div>
+      
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -156,27 +190,46 @@ export default function TextCompletionPage() {
               </button>
             ))}
             <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setLeftOpen(leftOpen === 'chapters' ? null : 'chapters')}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-200 font-medium"
-              >
-                {leftOpen === 'chapters' ? (
-                  <ChevronDown className="size-4" />
-                ) : (
-                  <ChevronRight className="size-4" />
-                )}
-                <FileText className="size-4" />
-                章节
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLeftOpen(leftOpen === 'chapters' ? null : 'chapters')}
+                  className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-200 font-medium"
+                >
+                  {leftOpen === 'chapters' ? (
+                    <ChevronDown className="size-4" />
+                  ) : (
+                    <ChevronRight className="size-4" />
+                  )}
+                  <FileText className="size-4" />
+                  章节
+                </button>
+                <button
+                  type="button"
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 shrink-0"
+                  onClick={() => {
+                    // TODO: 在此添加「添加章节」的逻辑
+                  }}
+                  title="添加章节"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
               {leftOpen === 'chapters' && (
                 <div className="pl-6 pr-2 py-1 space-y-0.5">
-                  <button type="button" className="flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900">
-                    <Plus className="size-3" /> 第二章 <span className="text-gray-400 ml-auto">0字</span>
-                  </button>
-                  <button type="button" className="flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900">
-                    第一章 <span className="text-gray-400 ml-auto">16字</span>
-                  </button>
+                  {novelList.map((chapter) => (
+                    <button 
+                      key={chapter.index}
+                      type="button" 
+                      onClick={() => selectChapter(chapter.index)}
+                      className={`flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900 ${currentChapterIndex === chapter.index ? 'bg-gray-200 font-medium' : ''}`}
+                    >
+                      {chapter.title} <span className="text-gray-400 ml-auto">{chapter.wordCount}字</span>
+                    </button>
+                  ))}
+                  {novelList.length === 0 && (
+                    <p className="text-xs text-gray-400 py-2">暂无章节，点击 + 添加</p>
+                  )}
                 </div>
               )}
             </div>
@@ -230,6 +283,13 @@ export default function TextCompletionPage() {
               >
                 <GitBranch className="size-4" /> 填写情节
               </button>
+              <button
+                type="button"
+                onClick={handleSaveArticle}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              >
+                <Upload className="size-4" /> 保存文章
+              </button>
               <button type="button" className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100">
                 <MoreHorizontal className="size-4" />
               </button>
@@ -254,10 +314,10 @@ export default function TextCompletionPage() {
 
           {/* 主编辑区 */}
           <div className="flex-1 p-4 overflow-auto">
-            <textarea
+            <textarea //文本内容具体获得位置，通过input（用usestate来设置的）来获得内容，然后通过onChange来设置内容
               className="w-full h-full min-h-[200px] p-4 border-0 resize-none focus:ring-0 focus:outline-none text-gray-900 placeholder:text-gray-400"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              value={content}// 从 Zustand 取值
+              onChange={(e)=>handleContentChange(e.target.value)}// 用户输入时，调用 Zustand 的 action 存值,存到zustand里
               placeholder="在此填写正文..."
             />
             {completion && (
@@ -336,5 +396,7 @@ export default function TextCompletionPage() {
         </aside>
       </div>
     </div>
+    <Toaster />
+    </>
   );
 }
