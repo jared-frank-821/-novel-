@@ -23,6 +23,8 @@ import {
   Info,
   Tag,
   BookOpen, 
+  Pencil,
+  Trash2,
   Users,
   FileText,
   Inbox,
@@ -37,11 +39,16 @@ import  useNovelListStore  from '@/store/useNovelListStore';
 
 export default function TextCompletionPage() {
   const { 
-    novelList, 
-    currentChapterIndex, 
-    selectChapter, 
-    updateChapterText 
-  } = useNovelListStore();
+    novelList, //小说列表
+    currentChapterIndex, //当前章节索引
+    trashList,//回收站列表
+    selectChapter, //选择章节
+    updateChapterText, //更新章节内容
+    updateChapter, //更新章节
+    addChapter ,//添加章节
+    deleteChapter,//删除章节
+    deleteTrashChapter//删除回收站章节
+  } = useNovelListStore();//使用 Zustand store 获取小说列表和当前选中的章节索引
 
   // 获取当前选中的章节内容
   const currentChapter = novelList.find(c => c.index === currentChapterIndex);
@@ -52,14 +59,15 @@ export default function TextCompletionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [rightPanelInput, setRightPanelInput] = useState('');
   const [smartComplete, setSmartComplete] = useState(true);
-  const [leftOpen, setLeftOpen] = useState<'chapters' | null>('chapters');
+  const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' | null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
+  const [editingChapterIndex, setEditingChapterIndex] = useState<number | null>(null);
 
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error' | 'no-key'>('checking');
   const [apiMessage, setApiMessage] = useState('正在检测API连接...');
 //   const [promptTextIndex, setPromptTextIndex] = useState(0);
 // const [promptTextList, setPromptTextList] = useState<{index: number; text: string}[]>([]);
-  useEffect(() => {
+  useEffect(() => {//调用api的函数
     const checkApiConnection = async () => {
       try {
         const response = await fetch('/api/completion', {
@@ -124,7 +132,7 @@ export default function TextCompletionPage() {
   };
 
   const handleFillBody = () => runCompletion(content);
-  const handleRightSend = () => {
+  const handleRightSend = () => {//发送右侧输入的内容到api
     runCompletion(rightPanelInput);
     setRightPanelInput('');
   };
@@ -209,23 +217,70 @@ export default function TextCompletionPage() {
                   className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 shrink-0"
                   onClick={() => {
                     // TODO: 在此添加「添加章节」的逻辑
+                    addChapter();//添加章节
                   }}
                   title="添加章节"
                 >
+                  {/* 添加章节按钮 */}
                   <Plus className="size-4" />
                 </button>
               </div>
-              {leftOpen === 'chapters' && (
+              {leftOpen === 'chapters' && (//// 只有当左侧栏展开"章节"时才显示
                 <div className="pl-6 pr-2 py-1 space-y-0.5">
-                  {novelList.map((chapter) => (
-                    <button 
-                      key={chapter.index}
-                      type="button" 
-                      onClick={() => selectChapter(chapter.index)}
-                      className={`flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900 ${currentChapterIndex === chapter.index ? 'bg-gray-200 font-medium' : ''}`}
-                    >
-                      {chapter.title} <span className="text-gray-400 ml-auto">{chapter.wordCount}字</span>
-                    </button>
+                  {novelList.map((chapter) => (//用map遍历小说列表，把每一章节都拿出来
+                    editingChapterIndex === chapter.index ? (//如果当前编辑的章节索引等于章节索引，则显示输入框
+                      // 输入框的显示
+                      <div key={chapter.index} className="flex items-center gap-2 w-full py-1.5">
+                        <input 
+                        type="text" 
+                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                        defaultValue={chapter.title}
+                        autoFocus
+                        // 1. 失去焦点时保存并退出 (体验更好)
+                        onBlur={(e) => {
+                          updateChapter(chapter.index, { title: e.target.value });
+                          setEditingChapterIndex(null); // 假设你的设置函数叫这个，记得把 index 设为 null 或 -1
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // 2. 按回车时保存
+                            updateChapter(chapter.index, { title: e.currentTarget.value });
+                            // 3. 关键：必须关闭编辑状态，才会切换回非编辑的显示界面
+                            setEditingChapterIndex(null); 
+                          }
+                          // 4. 可选：按 Esc 取消编辑
+                          if (e.key === 'Escape') {
+                            setEditingChapterIndex(null);
+                          }
+                        }}
+                      />
+                      </div>
+                    ) : (
+                      // 章节列表的显示
+                      <button 
+                        key={chapter.index}
+                        type="button" 
+                        onClick={() => selectChapter(chapter.index)}
+                        className={`flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900 ${currentChapterIndex === chapter.index ? 'bg-gray-200 font-medium' : ''}`}
+                      >
+                        {chapter.title} <span className="text-gray-400 ml-auto">{chapter.wordCount}字</span>
+                        {/* 静态编辑图标 */}
+                        <Pencil 
+                          className="size-3.5 text-gray-400 hover:text-blue-500 ml-2" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingChapterIndex(chapter.index);
+                          }}
+                        />
+                        {/* 静态删除图标 */}
+                        <Trash2 className="size-3.5 text-gray-400 hover:text-red-500 ml-2" onClick={(e)=>{
+                          e.stopPropagation();
+                          deleteChapter(chapter.index);// 阻止事件冒泡,防止触发点击章节事件
+                          toast.info('删除成功');
+                        }} />
+                      </button>
+                    )
                   ))}
                   {novelList.length === 0 && (
                     <p className="text-xs text-gray-400 py-2">暂无章节，点击 + 添加</p>
@@ -235,12 +290,37 @@ export default function TextCompletionPage() {
             </div>
             <button
               type="button"
+              onClick={() => setLeftOpen(leftOpen === 'trash' ? null : 'trash')}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
             >
-              <ChevronRight className="size-4" />
+              {leftOpen === 'trash' ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
               <Inbox className="size-4" />
-              草稿箱
+              回收站
             </button>
+            {leftOpen === 'trash' && (
+                <div className="pl-6 pr-2 py-1 space-y-0.5">
+                  {trashList.map((trashChapter) => (
+                    <div 
+                      key={trashChapter.id}
+                      className="flex items-center gap-2 w-full py-1.5 text-gray-400"
+                    >
+                      {trashChapter.title} <span className="text-gray-400 ml-auto">{trashChapter.wordCount}字</span>
+                      <Trash2 className="size-3.5 text-gray-400 hover:text-red-500 ml-2" onClick={(e)=>{
+                        e.stopPropagation();
+                        deleteTrashChapter(trashChapter.id);
+                        toast.info('已彻底删除');
+                      }} />
+                    </div>
+                  ))}
+                  {trashList.length === 0 && (
+                    <p className="text-xs text-gray-400 py-2">暂无回收文章</p>
+                  )}
+                </div>
+              )}
           </nav>
         </aside>
 
