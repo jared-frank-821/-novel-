@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
 import {
   ArrowLeft,
   ChevronDown,
@@ -148,12 +150,46 @@ export default function TextCompletionPage() {
     }
   };
 
-  // 处理文本内容变化
+  // 处理文本内容变化 - Tiptap 编辑器回调
   const handleContentChange = (newContent: string) => {
     if (currentChapterIndex > 0) {
       updateChapterText(currentChapterIndex, newContent);
     }
   };
+// 在 useEditor 之前创建一个 ref 存储定时器
+const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef 来存储定时器,这个定时器会在2秒后执行handleContentChange函数,使用 ref 而不是 state，是因为 ref 的变化不会触发组件重新渲染
+
+
+  // Tiptap 编辑器实例
+  const editor = useEditor({
+    extensions: [StarterKit],//配置编辑器的扩展包。StarterKit 是 Tiptap 提供的默认扩展，包含常见的富文本功能（如标题、列表、粗体、斜体等）
+    content: content,//设置编辑器的初始内容。content 变量来自 Zustand store（当前章节的文本内容）。
+    immediatelyRender: false,//设置为 false，避免在组件初始化时立即渲染编辑器内容。
+    onUpdate: ({ editor }) => {
+      const text=editor.getText()
+      //清除之前定时器
+      if(debounceRef.current){
+        clearTimeout(debounceRef.current)
+      }
+      //设置新的定时器
+      debounceRef.current=setTimeout(()=>{
+        handleContentChange(text)//这是内容变化回调——当用户在编辑器中输入/删除内容时触发。({ editor }) 是 Tiptap 传递的事件
+      },2000)
+    },
+    editorProps: {//配置编辑器的 DOM 属性，这里主要是给编辑器内容区设置 CSS 类名（样式）。
+      attributes: {
+        class: 'w-full h-full min-h-[200px] p-4 focus:outline-none text-gray-900 placeholder:text-gray-400',
+      },
+    },
+  });
+
+  // 同步编辑器内容当章节切换时
+  useEffect(() => {
+    if (editor && editor.getText() !== content) {//当用户切换章节时，content 变量会变
+      editor.commands.setContent(content);//editor.commands.setContent(content) 用新章节的内容替换编辑器当前内容
+    }
+  }, [content, editor]);//依赖项：当 content 或 editor 发生变化时，执行同步操作。
+
   return (
     <>
     <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -394,12 +430,7 @@ export default function TextCompletionPage() {
 
           {/* 主编辑区 */}
           <div className="flex-1 p-4 overflow-auto">
-            <textarea //文本内容具体获得位置，通过input（用usestate来设置的）来获得内容，然后通过onChange来设置内容
-              className="w-full h-full min-h-[200px] p-4 border-0 resize-none focus:ring-0 focus:outline-none text-gray-900 placeholder:text-gray-400"
-              value={content}// 从 Zustand 取值
-              onChange={(e)=>handleContentChange(e.target.value)}// 用户输入时，调用 Zustand 的 action 存值,存到zustand里
-              placeholder="在此填写正文..."
-            />
+            <EditorContent editor={editor} />
             {completion && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs text-gray-500 mb-2">续写结果：</p>
