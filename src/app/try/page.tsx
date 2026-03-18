@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import {
   ArrowLeft,
   ChevronDown,
@@ -24,7 +26,7 @@ import {
   Upload,
   Info,
   Tag,
-  BookOpen, 
+  BookOpen,
   Pencil,
   Trash2,
   Users,
@@ -40,7 +42,7 @@ import {
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
 // import { Button } from "@/components/ui/button"
-import  useNovelListStore  from '@/store/useNovelListStore';
+import useNovelListStore from '@/store/useNovelListStore';
 
 export default function TextCompletionPage() {
   const { 
@@ -62,16 +64,21 @@ export default function TextCompletionPage() {
   // const [input, setInput] = useState('');
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [rightPanelInput, setRightPanelInput] = useState('');
   const [smartComplete, setSmartComplete] = useState(true);
   const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' | null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
   const [editingChapterIndex, setEditingChapterIndex] = useState<number | null>(null);
   const [hasSelection, setHasSelection] = useState(false);//hasSelection - 是否有选中的文字（控制工具栏按钮显示
   const [isPolishing, setIsPolishing] = useState(false);//isPolishing - 是否正在润色（控制润色按钮的禁用状态
+  const [chatInput, setChatInput] = useState(''); // AI 对话输入，与 useChat 配合
 
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error' | 'no-key'>('checking');
   const [apiMessage, setApiMessage] = useState('正在检测API连接...');
+
+  // AI 对话：连接 /api/chat，用于右侧「AI对话」分支
+  const { messages, sendMessage, status: chatStatus } = useChat({
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+  });
 
   useEffect(() => {//调用api的函数
     const checkApiConnection = async () => {
@@ -137,10 +144,9 @@ export default function TextCompletionPage() {
     }
   };
 
-  const handleFillBody = () => runCompletion(content);
-  const handleRightSend = () => {//发送右侧输入的内容到api
-    runCompletion(rightPanelInput);
-    setRightPanelInput('');
+  const handleFillBody = () => {
+    setRightTab('inspiration'); // 续写结果展示在灵感卡片，先切到该 tab
+    runCompletion(content);
   };
 
   const wordCount = content.replace(/\s/g, '').length;
@@ -565,7 +571,12 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 text-sm font-medium"
+                onClick={() => {
+                  setRightTab('inspiration');
+                  runCompletion(content);
+                }}
+                disabled={isLoading || apiStatus !== 'connected'}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 <GitBranch className="size-4" /> 续写情节
               </button>
@@ -598,30 +609,9 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             <span className="text-gray-600">字号: 标准</span>
           </div>
 
-          {/* 主编辑区 */}
+          {/* 主编辑区：续写结果已移至右侧「灵感卡片」 */}
           <div className="flex-1 p-4 overflow-auto">
             <EditorContent editor={editor} />
-            {completion && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">续写结果：</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editor) {
-                        // 在编辑器末尾插入续写内容
-                        editor.commands.insertContent(completion);
-                        setCompletion('');
-                      }
-                    }}
-                    className="px-3 py-1 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600"
-                  >
-                    采用
-                  </button>
-                </div>
-                <div className="text-gray-700 whitespace-pre-wrap">{completion}</div>
-              </div>
-            )}
             {apiStatus !== 'connected' && (
               <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
                 {apiMessage}
@@ -651,13 +641,40 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
           <div className="flex-1 flex flex-col p-4 min-h-0 overflow-hidden">
             {rightTab === 'ai' && (
               <>
-                <div className="mb-4 shrink-0">
-                  <p className="text-xs text-gray-500 mb-2">内容由AI生成，仅供参考</p>
-                  <div className="p-3 rounded-lg bg-white border border-gray-200">
-                    <p className="text-sm text-gray-700">
-                      嗨! 我是智能写作助手。今天想写什么故事?
-                    </p>
-                  </div>
+                <p className="text-xs text-gray-500 mb-2 shrink-0">内容由AI生成，仅供参考</p>
+                <div className="flex-1 overflow-auto space-y-3 mb-3 min-h-0">
+                  {messages.length === 0 && (
+                    <div className="p-3 rounded-lg bg-white border border-gray-200">
+                      <p className="text-sm text-gray-700">嗨! 我是智能写作助手。今天想写什么故事?</p>
+                    </div>
+                  )}
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`p-3 rounded-lg text-sm ${
+                        message.role === 'user'
+                          ? 'bg-emerald-50 border border-emerald-200 ml-4'
+                          : 'bg-white border border-gray-200 mr-4'
+                      }`}
+                    >
+                      <span className="font-medium text-gray-500 text-xs block mb-1">
+                        {message.role === 'user' ? '你' : 'AI'}
+                      </span>
+                      <div className="text-gray-700 whitespace-pre-wrap">
+                        {message.parts
+                          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                          .map((p, i) => (
+                            <span key={i}>{p.text}</span>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                  {(chatStatus === 'submitted' || chatStatus === 'streaming') && (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <Loader2 className="size-4 animate-spin" />
+                      正在回复…
+                    </div>
+                  )}
                 </div>
                 <div className="mt-auto space-y-2 shrink-0">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -668,15 +685,21 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none placeholder:text-gray-400"
                     rows={2}
                     placeholder="写作课如何写好? 试试..."
-                    value={rightPanelInput}
-                    onChange={(e) => setRightPanelInput(e.target.value)}
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    disabled={chatStatus !== 'ready'}
                   />
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">默认工具</span>
                     <button
                       type="button"
-                      onClick={handleRightSend}
-                      disabled={isLoading || apiStatus !== 'connected'}
+                      onClick={() => {
+                        if (chatInput.trim()) {
+                          sendMessage({ text: chatInput });
+                          setChatInput('');
+                        }
+                      }}
+                      disabled={chatStatus !== 'ready' || !chatInput.trim()}
                       className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 text-sm"
                     >
                       发送
@@ -686,7 +709,45 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
               </>
             )}
             {rightTab === 'inspiration' && (
-              <div className="text-sm text-gray-500 text-center py-8">灵感卡片内容区域</div>
+              <div className="flex flex-col h-full min-h-0 overflow-auto">
+                {completion ? (
+                  <div className="border border-gray-200 rounded-lg bg-white p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-gray-500">续写结果：</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editor) {
+                            editor.commands.insertContent(completion);
+                            setCompletion('');
+                          }
+                          toast.success('已插入正文');
+                        }}
+                        className="px-3 py-1 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600"
+                      >
+                        采用
+                      </button>
+                    </div>
+                    <div className="text-gray-700 text-sm whitespace-pre-wrap">{completion}</div>
+                    {isLoading && (
+                      <div className="flex items-center gap-2 mt-2 text-gray-400 text-xs">
+                        <Loader2 className="size-4 animate-spin" />
+                        续写中…
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 text-center py-8">
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="size-4 animate-spin" /> 续写中…
+                      </span>
+                    ) : (
+                      '点击「续写正文」或「续写情节」后，AI 生成的内容会显示在这里，可点击「采用」插入到正文。'
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </aside>
