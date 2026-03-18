@@ -12,6 +12,8 @@
     "@ai-sdk/deepseek": "^2.0.24",
     "@ai-sdk/react": "^3.0.118",
     "@tiptap/extension-bubble-menu": "^3.20.1",
+    "@tiptap/extension-highlight": "^3.20.4",
+    "@tiptap/extension-underline": "^3.20.4",
     "@tiptap/pm": "^3.20.1",
     "@tiptap/react": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
