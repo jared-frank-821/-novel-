@@ -33,6 +33,9 @@ import {
   Plus,
   MessageCircle,
   Lightbulb,
+  Download,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
@@ -64,11 +67,12 @@ export default function TextCompletionPage() {
   const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' | null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
   const [editingChapterIndex, setEditingChapterIndex] = useState<number | null>(null);
+  const [hasSelection, setHasSelection] = useState(false);//hasSelection - 是否有选中的文字（控制工具栏按钮显示
+  const [isPolishing, setIsPolishing] = useState(false);//isPolishing - 是否正在润色（控制润色按钮的禁用状态
 
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error' | 'no-key'>('checking');
   const [apiMessage, setApiMessage] = useState('正在检测API连接...');
-//   const [promptTextIndex, setPromptTextIndex] = useState(0);
-// const [promptTextList, setPromptTextList] = useState<{index: number; text: string}[]>([]);
+
   useEffect(() => {//调用api的函数
     const checkApiConnection = async () => {
       try {
@@ -139,7 +143,7 @@ export default function TextCompletionPage() {
     setRightPanelInput('');
   };
 
-  const wordCount = (content + completion).replace(/\s/g, '').length;
+  const wordCount = content.replace(/\s/g, '').length;
 
   const handleSaveArticle = () => {
     if (currentChapterIndex > 0) {
@@ -190,6 +194,105 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
     }
   }, [content, editor]);//依赖项：当 content 或 editor 发生变化时，执行同步操作。
 
+  // 监听选区变化
+  useEffect(() => {
+    if (!editor) return;
+    
+    const handleSelectionChange = () => {
+      const { from, to } = editor.state.selection;//editor.state.selection 包含 from 和 to 两个位置： from === to → 光标位置（没有选中文字）from !== to → 选中了文字
+      setHasSelection(from !== to);
+    };
+    
+    editor.on('selectionUpdate', handleSelectionChange);
+    return () => {
+      editor.off('selectionUpdate', handleSelectionChange);
+    };
+  }, [editor]);
+
+  // AI 润色/改写函数
+  const handleAIPolish = async (mode: 'polish' | 'simplify' | 'expand' | 'rewrite') => {
+    if (!editor) return;
+    
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, ' ');//editor.state.doc.textBetween(from, to) - 获取选中的文字
+    
+    if (!selectedText || selectedText.trim() === '') {
+      toast.warning('请先选中需要润色的文字');
+      return;
+    }
+
+    setIsPolishing(true);
+    try {
+      const response = await fetch('/api/polish', {//调用 AI 接口
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: selectedText, mode })
+      });
+
+      const data = await response.json();
+      
+      if (data.result) {
+        editor.chain().focus().deleteSelection().insertContent(data.result).run();//替换选中的文本
+        toast.success('润色完成');
+      } else if (data.message) {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error('润色失败:', error);
+      toast.error('润色失败，请稍后重试');
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  // 导出数据为 JSON 文件
+  const exportToJson = () => {
+    const data = localStorage.getItem('novelList');
+    const blob = new Blob([data || '{}'], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `小说备份-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('导出成功！');
+  };
+
+  // 从 JSON 文件导入数据
+  const importFromJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        
+        // 验证数据格式
+        if (!data.state?.novelList && !data.novelList) {
+          throw new Error('无效的备份文件');
+        }
+
+        // 恢复数据到 localStorage
+        localStorage.setItem('novelList', JSON.stringify(data));
+        
+        toast.success('导入成功！即将刷新页面...');
+        
+        // 延迟刷新页面
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } catch (err) {
+        toast.error('导入失败：无效的备份文件');
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+    
+    // 清空 input 值，允许重复选择同一文件
+    event.target.value = '';
+  };
+
   return (
     <>
     <div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -204,9 +307,29 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             本章字数: {content.replace(/\s/g, '').length} 总字数: {wordCount}
           </span>
           <Info className="size-4 text-gray-400" />
-          <Toaster />  
+          <Toaster />
         </div>
-      
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportToJson}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            <Download className="size-4" />
+            导出备份
+          </button>
+          <label className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-md transition-colors cursor-pointer">
+            <Upload className="size-4" />
+            导入备份
+            <input
+              type="file"
+              accept=".json"
+              onChange={importFromJson}
+              className="hidden"
+            />
+          </label>
+        </div>
+
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -379,6 +502,53 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             <button type="button" className="p-2 rounded hover:bg-gray-100"><List className="size-4" /></button>
             <button type="button" className="p-2 rounded hover:bg-gray-100"><ListOrdered className="size-4" /></button>
             <button type="button" className="p-2 rounded hover:bg-gray-100"><AlignLeft className="size-4" /></button>
+            
+            {/* AI 润色工具栏 - 选中文字时显示 */}
+            {hasSelection && (//如果没有选中文字，hasseltciton为false，不会显示AI润色工具栏
+              <>
+                <span className="w-px h-5 bg-gray-200 mx-1" />
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 mr-1">AI:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAIPolish('polish')}
+                    disabled={isPolishing}
+                    className="px-2 py-1 text-xs rounded hover:bg-purple-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    title="润色"
+                  >
+                    {isPolishing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    润色
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAIPolish('simplify')}
+                    disabled={isPolishing}
+                    className="px-2 py-1 text-xs rounded hover:bg-purple-100 transition-colors disabled:opacity-50"
+                    title="精简"
+                  >
+                    精简
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAIPolish('expand')}
+                    disabled={isPolishing}
+                    className="px-2 py-1 text-xs rounded hover:bg-purple-100 transition-colors disabled:opacity-50"
+                    title="扩展"
+                  >
+                    扩展
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAIPolish('rewrite')}
+                    disabled={isPolishing}
+                    className="px-2 py-1 text-xs rounded hover:bg-purple-100 transition-colors disabled:opacity-50"
+                    title="改写"
+                  >
+                    改写
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* AI 创作提示 + 按钮 */}
@@ -391,13 +561,13 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
                 disabled={isLoading || apiStatus !== 'connected'}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
-                <PenLine className="size-4" /> 填写正文
+                <PenLine className="size-4" /> 续写正文
               </button>
               <button
                 type="button"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 text-sm font-medium"
               >
-                <GitBranch className="size-4" /> 填写情节
+                <GitBranch className="size-4" /> 续写情节
               </button>
               <button
                 type="button"
@@ -433,7 +603,22 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             <EditorContent editor={editor} />
             {completion && (
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-2">续写结果：</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">续写结果：</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editor) {
+                        // 在编辑器末尾插入续写内容
+                        editor.commands.insertContent(completion);
+                        setCompletion('');
+                      }
+                    }}
+                    className="px-3 py-1 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600"
+                  >
+                    采用
+                  </button>
+                </div>
                 <div className="text-gray-700 whitespace-pre-wrap">{completion}</div>
               </div>
             )}
