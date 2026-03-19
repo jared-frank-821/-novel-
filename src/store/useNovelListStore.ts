@@ -29,7 +29,7 @@ export interface Novel {
   description?: string;
   category?: string;
   status?: string;
-  cover?: string;
+  coverId?: string;//存 IndexedDB 的图片 ID
   createTime: string;
   updateTime: string;
   chapters: Chapter[];
@@ -44,6 +44,7 @@ type NovelListStore = {
   // 小说操作
   addNovel: (title?: string) => void;
   updateNovel: (id: string, data: Partial<Novel>) => void;
+  updateNovelCover:(id:string,coverId:string) => void;
   deleteNovel: (id: string) => void;
   selectNovel: (id: string) => void;
 
@@ -103,6 +104,16 @@ const useNovelListStore = create<NovelListStore>()(
             : novel//否则保持原样
         );
         set({ novels: updatedList });//更新小说列表
+      },
+      //更新小说封面
+      updateNovelCover: async (id: string, coverId: string) => {
+        const { novels } = get();
+        const updatedList = novels.map(novel =>
+          novel.id === id
+            ? { ...novel, coverId, updateTime: new Date().toISOString() }
+            : novel
+        );
+        set({ novels: updatedList });
       },
 
       // 删除小说
@@ -310,6 +321,28 @@ const useNovelListStore = create<NovelListStore>()(
     {
       name: 'novelList',
       storage: createJSONStorage(() => localStorage),
+      // 只持久化这 4 个字段，避免写入旧版遗留的 novelList 等
+      partialize: (state) => ({
+        novels: state.novels,
+        currentNovelId: state.currentNovelId,
+        currentChapterIndex: state.currentChapterIndex,
+        trashList: state.trashList,
+      }),
+      // 恢复时只认新结构，忽略旧版的 novelList，避免 state 里出现脏数据
+      merge: (persistedState, currentState) => {
+        const p = persistedState as Record<string, unknown> | null;
+        if (!p || typeof p !== 'object') return currentState;
+        const currentNovelId = p.currentNovelId === null || typeof p.currentNovelId === 'string'
+          ? p.currentNovelId
+          : currentState.currentNovelId;
+        return {
+          ...currentState,
+          novels: Array.isArray(p.novels) ? p.novels : currentState.novels,
+          currentNovelId,
+          currentChapterIndex: typeof p.currentChapterIndex === 'number' ? p.currentChapterIndex : currentState.currentChapterIndex,
+          trashList: Array.isArray(p.trashList) ? p.trashList : currentState.trashList,
+        };
+      },
     }
   )
 );
