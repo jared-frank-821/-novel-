@@ -42,6 +42,11 @@ import {
   Sparkles,
   Loader2,
   Highlighter,
+  Book,
+  Library,
+  FolderOpen,
+  X,
+  FolderPlus,
 } from 'lucide-react';
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
@@ -49,20 +54,27 @@ import { Toaster } from "@/components/ui/sonner";
 import useNovelListStore from '@/store/useNovelListStore';
 
 export default function TextCompletionPage() {
-  const { 
-    novelList, //小说列表
-    currentChapterIndex, //当前章节索引
-    trashList,//回收站列表
-    selectChapter, //选择章节
-    updateChapterText, //更新章节内容
-    updateChapter, //更新章节
-    addChapter ,//添加章节
-    deleteChapter,//删除章节
-    deleteTrashChapter//删除回收站章节
-  } = useNovelListStore();//使用 Zustand store 获取小说列表和当前选中的章节索引
+  const {
+    novels,
+    currentNovelId,
+    currentChapterIndex,
+    trashList,
+    selectNovel,
+    updateNovel,
+    addNovel,
+    deleteNovel,
+    selectChapter,
+    updateChapterText,
+    updateChapter,
+    addChapter,
+    deleteChapter,
+    deleteTrashChapter
+  } = useNovelListStore();
 
-  // 获取当前选中的章节内容
-  const currentChapter = novelList.find(c => c.index === currentChapterIndex);
+  // 获取当前选中的小说
+  const currentNovel = novels.find(n => n.id === currentNovelId);
+  // 获取当前选中的章节
+  const currentChapter = currentNovel?.chapters.find(c => c.index === currentChapterIndex);
   const content = currentChapter?.text || '';
   
   // const [input, setInput] = useState('');
@@ -78,6 +90,22 @@ export default function TextCompletionPage() {
 
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'error' | 'no-key'>('checking');
   const [apiMessage, setApiMessage] = useState('正在检测API连接...');
+  const [showNovelSelector, setShowNovelSelector] = useState(false);
+  const [editingNovelId, setEditingNovelId] = useState<string | null>(null);
+
+  // 点击外部关闭小说选择器
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.novel-selector')) {
+        setShowNovelSelector(false);
+      }
+    };
+    if (showNovelSelector) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showNovelSelector]);
 
   // AI 对话：连接 /api/chat，用于右侧「AI对话」分支
   const { messages, sendMessage, status: chatStatus } = useChat({
@@ -153,7 +181,7 @@ export default function TextCompletionPage() {
     runCompletion(content);
   };
 
-  const wordCount = content.replace(/\s/g, '').length;
+  const totalWordCount = currentNovel?.chapters.reduce((sum, chapter) => sum + (chapter.wordCount || 0), 0) || 0;
 
   const handleSaveArticle = () => {
     if (currentChapterIndex > 0) {
@@ -162,6 +190,18 @@ export default function TextCompletionPage() {
     } else {
       toast.error("请先选择或创建一个章节");
     }
+  };
+
+  // 添加新小说
+  const handleAddNovel = () => {
+    addNovel();
+    setShowNovelSelector(false);
+  };
+
+  // 切换小说
+  const handleSelectNovel = (id: string) => {
+    selectNovel(id);
+    setShowNovelSelector(false);
   };
 
   // 处理文本内容变化 - Tiptap 编辑器回调
@@ -287,17 +327,17 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        
-        // 验证数据格式
-        if (!data.state?.novelList && !data.novelList) {
+
+        // 验证数据格式 - 新格式有 novels 数组
+        if (!data.state?.novels && !data.novels) {
           throw new Error('无效的备份文件');
         }
 
         // 恢复数据到 localStorage
         localStorage.setItem('novelList', JSON.stringify(data));
-        
+
         toast.success('导入成功！即将刷新页面...');
-        
+
         // 延迟刷新页面
         setTimeout(() => {
           window.location.reload();
@@ -308,7 +348,7 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
       }
     };
     reader.readAsText(file);
-    
+
     // 清空 input 值，允许重复选择同一文件
     event.target.value = '';
   };
@@ -323,8 +363,74 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             <ArrowLeft className="size-4" /> 退出
           </button>
           <span className="text-sm text-gray-500">已保存到云端</span>
+
+          {/* 小说选择器 */}
+          <div className="relative novel-selector">
+            <button
+              type="button"
+              onClick={() => setShowNovelSelector(!showNovelSelector)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              <Library className="size-4" />
+              <span className="font-medium text-gray-900">
+                {currentNovel?.title || '选择小说'}
+              </span>
+              <ChevronDown className="size-4 text-gray-500" />
+            </button>
+
+            {/* 小说下拉列表 */}
+            {showNovelSelector && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-2 border-b border-gray-100">
+                  <button
+                    type="button"
+                    onClick={handleAddNovel}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
+                  >
+                    <FolderPlus className="size-4" />
+                    新建小说
+                  </button>
+                </div>
+                <div className="max-h-60 overflow-auto p-1">
+                  {novels.length === 0 ? (
+                    <p className="px-3 py-4 text-sm text-gray-400 text-center">暂无小说</p>
+                  ) : (
+                    novels.map(novel => (
+                      <div
+                        key={novel.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer ${
+                          currentNovelId === novel.id
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleSelectNovel(novel.id)}
+                      >
+                        <Book className="size-4 text-gray-400" />
+                        <span className="flex-1 text-sm truncate">{novel.title}</span>
+                        <span className="text-xs text-gray-400">
+                          {novel.chapters.length}章
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNovel(novel.id);
+                            toast.info('小说已删除');
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <span className="text-sm text-gray-600">
-            本章字数: {content.replace(/\s/g, '').length} 总字数: {wordCount}
+            本章字数: {content.replace(/\s/g, '').length} 总字数: {totalWordCount}
           </span>
           <Info className="size-4 text-gray-400" />
           <Toaster />
@@ -360,22 +466,17 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             <span className="font-medium text-gray-900">我的作品</span>
           </div>
           <nav className="p-2 space-y-0.5 text-sm">
-            {[
-              { key: 'info', label: '作品信息', icon: FileText },
-              { key: 'tags', label: '标签', icon: Tag },
-              { key: 'outline', label: '大纲', icon: BookOpen },
-              { key: 'chars', label: '角色', icon: Users },
-            ].map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
-              >
-                <ChevronRight className="size-4" />
-                <Icon className="size-4" />
-                {label}
-              </button>
-            ))}
+            {/* 作品信息 - 当前小说 */}
+            <button
+              type="button"
+              onClick={() => setShowNovelSelector(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
+            >
+              <ChevronRight className="size-4" />
+              <FolderOpen className="size-4" />
+              作品信息
+            </button>
+
             <div className="pt-1">
               <div className="flex items-center gap-1">
                 <button
@@ -395,74 +496,71 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
                   type="button"
                   className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 shrink-0"
                   onClick={() => {
-                    // TODO: 在此添加「添加章节」的逻辑
-                    addChapter();//添加章节
+                    if (!currentNovelId) {
+                      toast.warning('请先创建或选择一个小说');
+                      return;
+                    }
+                    addChapter();
                   }}
                   title="添加章节"
                 >
-                  {/* 添加章节按钮 */}
                   <Plus className="size-4" />
                 </button>
               </div>
-              {leftOpen === 'chapters' && (//// 只有当左侧栏展开"章节"时才显示
+              {leftOpen === 'chapters' && (
                 <div className="pl-6 pr-2 py-1 space-y-0.5">
-                  {novelList.map((chapter) => (//用map遍历小说列表，把每一章节都拿出来
-                    editingChapterIndex === chapter.index ? (//如果当前编辑的章节索引等于章节索引，则显示输入框
-                      // 输入框的显示
-                      <div key={chapter.index} className="flex items-center gap-2 w-full py-1.5">
-                        <input 
-                        type="text" 
-                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-                        defaultValue={chapter.title}
-                        autoFocus
-                        // 1. 失去焦点时保存并退出 (体验更好)
-                        onBlur={(e) => {
-                          updateChapter(chapter.index, { title: e.target.value });
-                          setEditingChapterIndex(null); // 假设你的设置函数叫这个，记得把 index 设为 null 或 -1
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            // 2. 按回车时保存
-                            updateChapter(chapter.index, { title: e.currentTarget.value });
-                            // 3. 关键：必须关闭编辑状态，才会切换回非编辑的显示界面
-                            setEditingChapterIndex(null); 
-                          }
-                          // 4. 可选：按 Esc 取消编辑
-                          if (e.key === 'Escape') {
-                            setEditingChapterIndex(null);
-                          }
-                        }}
-                      />
-                      </div>
-                    ) : (
-                      // 章节列表的显示
-                      <button 
-                        key={chapter.index}
-                        type="button" 
-                        onClick={() => selectChapter(chapter.index)}
-                        className={`flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900 ${currentChapterIndex === chapter.index ? 'bg-gray-200 font-medium' : ''}`}
-                      >
-                        {chapter.title} <span className="text-gray-400 ml-auto">{chapter.wordCount}字</span>
-                        {/* 静态编辑图标 */}
-                        <Pencil 
-                          className="size-3.5 text-gray-400 hover:text-blue-500 ml-2" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingChapterIndex(chapter.index);
-                          }}
-                        />
-                        {/* 静态删除图标 */}
-                        <Trash2 className="size-3.5 text-gray-400 hover:text-red-500 ml-2" onClick={(e)=>{
-                          e.stopPropagation();
-                          deleteChapter(chapter.index);// 阻止事件冒泡,防止触发点击章节事件
-                          toast.info('删除成功');
-                        }} />
-                      </button>
-                    )
-                  ))}
-                  {novelList.length === 0 && (
+                  {!currentNovel ? (
+                    <p className="text-xs text-gray-400 py-2">请先选择小说</p>
+                  ) : currentNovel.chapters.length === 0 ? (
                     <p className="text-xs text-gray-400 py-2">暂无章节，点击 + 添加</p>
+                  ) : (
+                    currentNovel.chapters.map((chapter) => (
+                      editingChapterIndex === chapter.index ? (
+                        <div key={chapter.index} className="flex items-center gap-2 w-full py-1.5">
+                          <input
+                            type="text"
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                            defaultValue={chapter.title}
+                            autoFocus
+                            onBlur={(e) => {
+                              updateChapter(chapter.index, { title: e.target.value });
+                              setEditingChapterIndex(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                updateChapter(chapter.index, { title: e.currentTarget.value });
+                                setEditingChapterIndex(null);
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingChapterIndex(null);
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          key={chapter.index}
+                          type="button"
+                          onClick={() => selectChapter(chapter.index)}
+                          className={`flex items-center gap-2 w-full py-1.5 text-gray-600 hover:text-gray-900 ${currentChapterIndex === chapter.index ? 'bg-gray-200 font-medium' : ''}`}
+                        >
+                          {chapter.title} <span className="text-gray-400 ml-auto">{chapter.wordCount}字</span>
+                          <Pencil
+                            className="size-3.5 text-gray-400 hover:text-blue-500 ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingChapterIndex(chapter.index);
+                            }}
+                          />
+                          <Trash2 className="size-3.5 text-gray-400 hover:text-red-500 ml-2" onClick={(e) => {
+                            e.stopPropagation();
+                            deleteChapter(chapter.index);
+                            toast.info('删除成功');
+                          }} />
+                        </button>
+                      )
+                    ))
                   )}
                 </div>
               )}

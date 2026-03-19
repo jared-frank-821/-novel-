@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { persist,createJSONStorage } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface Chapter {
+  id: string;
   index: number;
   title: string;
   text: string;
@@ -20,11 +21,32 @@ export interface TrashChapter {
   status: string;
   wordCount: number;
 }
-type NovelListStore={
-  novelList: Chapter[];
-  trashList: TrashChapter[];
+
+export interface Novel {
+  id: string;
+  title: string;
+  author?: string;
+  description?: string;
+  category?: string;
+  status?: string;
+  cover?: string;
+  createTime: string;
+  updateTime: string;
+  chapters: Chapter[];
+}
+
+type NovelListStore = {
+  novels: Novel[];
+  currentNovelId: string | null;
   currentChapterIndex: number;
-  
+  trashList: TrashChapter[];
+
+  // 小说操作
+  addNovel: (title?: string) => void;
+  updateNovel: (id: string, data: Partial<Novel>) => void;
+  deleteNovel: (id: string) => void;
+  selectNovel: (id: string) => void;
+
   // 章节操作
   addChapter: (title?: string) => void;
   updateChapterText: (index: number, text: string) => void;
@@ -32,91 +54,211 @@ type NovelListStore={
   selectChapter: (index: number) => void;
   deleteChapter: (index: number) => void;
   resetNovelList: () => void;
-  // addTrashChapter: (chapter: TrashChapter) => void;
+
+  // 回收站操作
   deleteTrashChapter: (id: string) => void;
+  // 清空所有数据
+  clearAll: () => void;
 }
+
+// 工具函数：生成唯一ID
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const useNovelListStore = create<NovelListStore>()(
   persist(
     (set, get) => ({
-      novelList: [],
+      novels: [],
+      currentNovelId: null,
       currentChapterIndex: 0,
       trashList: [],
 
-      addChapter: (title?: string) => {
-        const { novelList } = get();//从本地存储中获取当前的小说列表
-        const newIndex = novelList.length > 0 ? Math.max(...novelList.map(c => c.index)) + 1 : 1;//计算新的章节索引
-        const now = new Date().toISOString();//获取当前时间
-        const newChapter: Chapter = {//创建新的章节对象
-          index: newIndex,
-          title: title || `第${newIndex}章`,//设置章节标题
-          text: '',//设置章节内容
+      // 添加新小说
+      addNovel: (title?: string) => {
+        const { novels } = get();
+        const now = new Date().toISOString();
+        const newNovel: Novel = {
+          id: generateId(),
+          title: title || `新小说 ${novels.length + 1}`,
+          author: '作者',
+          description: '',
+          category: '未分类',
+          status: '连载中',
+          createTime: now,
           updateTime: now,
-          createTime: now,//设置章节创建时间
-          status: 'draft',
-          wordCount: 0,//设置章节字数
+          chapters: [],
         };
-        set({ //更新小说列表
-          novelList: [...novelList, newChapter],
-          currentChapterIndex: newIndex//设置当前选中的章节索引
+        set({
+          novels: [...novels, newNovel],
+          currentNovelId: newNovel.id,
+          currentChapterIndex: 0,
         });
       },
 
+      // 更新小说信息
+      updateNovel: (id: string, data: Partial<Novel>) => {
+        const { novels } = get();
+        const updatedList = novels.map(novel =>
+          novel.id === id//如果id相同，则更新小说信息
+            ? { ...novel, ...data, updateTime: new Date().toISOString() }//...novel是展开小说信息，...data是展开更新数据，会覆盖掉传进来的数据，updateTime是更新时间
+            : novel//否则保持原样
+        );
+        set({ novels: updatedList });//更新小说列表
+      },
+
+      // 删除小说
+      deleteNovel: (id: string) => {
+        const { novels, currentNovelId } = get();
+        const filteredList = novels.filter(novel => novel.id !== id);
+
+        // 如果删除的是当前选中的小说，选择另一个
+        let newCurrentId = currentNovelId;
+        if (currentNovelId === id) {
+          newCurrentId = filteredList.length > 0 ? filteredList[0].id : null;
+        }
+
+        set({
+          novels: filteredList,
+          currentNovelId: newCurrentId,
+          currentChapterIndex: 0,
+        });
+      },
+
+      // 切换当前小说
+      selectNovel: (id: string) => {
+        set({
+          currentNovelId: id,
+          currentChapterIndex: 0,
+        });
+      },
+
+      // 在当前小说中添加章节
+      addChapter: (title?: string) => {
+        const { novels, currentNovelId } = get();
+        if (!currentNovelId) return;
+
+        const novelIndex = novels.findIndex(n => n.id === currentNovelId);
+        if (novelIndex === -1) return;
+
+        const novel = novels[novelIndex];
+        const newIndex = novel.chapters.length > 0
+          ? Math.max(...novel.chapters.map(c => c.index)) + 1
+          : 1;
+        const now = new Date().toISOString();
+
+        const newChapter: Chapter = {
+          id: generateId(),
+          index: newIndex,
+          title: title || `第${newIndex}章`,
+          text: '',
+          updateTime: now,
+          createTime: now,
+          status: 'draft',
+          wordCount: 0,
+        };
+
+        const updatedNovels = [...novels];
+        updatedNovels[novelIndex] = {
+          ...novel,
+          chapters: [...novel.chapters, newChapter],
+          updateTime: now,
+        };
+
+        set({
+          novels: updatedNovels,
+          currentChapterIndex: newIndex,
+        });
+      },
+
+      // 更新章节内容
       updateChapterText: (index: number, text: string) => {
-        const { novelList } = get();
-        const updatedList = novelList.map(chapter => 
-          chapter.index === index 
-            ? { 
-                ...chapter, 
-                text, 
+        const { novels, currentNovelId } = get();
+        if (!currentNovelId) return;
+
+        const novelIndex = novels.findIndex(n => n.id === currentNovelId);
+        if (novelIndex === -1) return;
+
+        const updatedChapters = novels[novelIndex].chapters.map(chapter =>
+          chapter.index === index
+            ? {
+                ...chapter,
+                text,
                 updateTime: new Date().toISOString(),
-                wordCount: text.replace(/\s/g, '').length 
-              } 
+                wordCount: text.replace(/\s/g, '').length,
+              }
             : chapter
         );
-        set({ novelList: updatedList });
+
+        const updatedNovels = [...novels];
+        updatedNovels[novelIndex] = {
+          ...novels[novelIndex],
+          chapters: updatedChapters,
+          updateTime: new Date().toISOString(),
+        };
+
+        set({ novels: updatedNovels });
       },
 
+      // 更新章节信息
       updateChapter: (index: number, data: Partial<Chapter>) => {
-        const { novelList } = get();
-        const updatedList = novelList.map(chapter => 
-          chapter.index === index 
-            ? { 
-                ...chapter, 
-                ...data,
-                updateTime: new Date().toISOString()
-              } 
+        const { novels, currentNovelId } = get();
+        if (!currentNovelId) return;
+
+        const novelIndex = novels.findIndex(n => n.id === currentNovelId);
+        if (novelIndex === -1) return;
+
+        const updatedChapters = novels[novelIndex].chapters.map(chapter =>
+          chapter.index === index
+            ? { ...chapter, ...data, updateTime: new Date().toISOString() }
             : chapter
         );
-        set({ novelList: updatedList });
+
+        const updatedNovels = [...novels];
+        updatedNovels[novelIndex] = {
+          ...novels[novelIndex],
+          chapters: updatedChapters,
+          updateTime: new Date().toISOString(),
+        };
+
+        set({ novels: updatedNovels });
       },
 
+      // 选择章节
       selectChapter: (index: number) => {
         set({ currentChapterIndex: index });
       },
 
+      // 删除章节（移到回收站）
       deleteChapter: (index: number) => {
-        const { novelList, currentChapterIndex, trashList } = get();
-        
-        // 找到要删除的章节
-        const chapterToDelete = novelList.find(chapter => chapter.index === index);
-        
+        const { novels, currentNovelId, currentChapterIndex, trashList } = get();
+        if (!currentNovelId) return;
+
+        const novelIndex = novels.findIndex(n => n.id === currentNovelId);
+        if (novelIndex === -1) return;
+
+        const novel = novels[novelIndex];
+        const chapterToDelete = novel.chapters.find(c => c.index === index);
         if (!chapterToDelete) return;
 
-        // 从 novelList 中移除该章节
-        const filteredList = novelList.filter(chapter => chapter.index !== index);
-        
-        // 如果删除的是当前选中的章节，选择最后一个
+        // 从章节列表中移除
+        const filteredChapters = novel.chapters.filter(c => c.index !== index);
+
+        // 更新章节索引
+        const reindexedChapters = filteredChapters.map((ch, i) => ({
+          ...ch,
+          index: i + 1,
+        }));
+
+        // 处理当前选中的章节
         let newCurrentIndex = currentChapterIndex;
         if (currentChapterIndex === index) {
-          newCurrentIndex = filteredList.length > 0 
-            ? filteredList[filteredList.length - 1].index 
+          newCurrentIndex = reindexedChapters.length > 0
+            ? reindexedChapters[reindexedChapters.length - 1].index
             : 0;
         }
-       
-        // 创建回收站章节（使用唯一ID，避免与novelList的index冲突）
+
+        // 创建回收站章节
         const newTrashChapter: TrashChapter = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateId(),
           title: chapterToDelete.title,
           text: chapterToDelete.text,
           updateTime: new Date().toISOString(),
@@ -124,30 +266,48 @@ const useNovelListStore = create<NovelListStore>()(
           status: chapterToDelete.status,
           wordCount: chapterToDelete.wordCount,
         };
-        
-        set({ 
-          novelList: filteredList,
+
+        const updatedNovels = [...novels];
+        updatedNovels[novelIndex] = {
+          ...novel,
+          chapters: reindexedChapters,
+          updateTime: new Date().toISOString(),
+        };
+
+        set({
+          novels: updatedNovels,
           currentChapterIndex: newCurrentIndex,
-          trashList: [...trashList, newTrashChapter]
+          trashList: [...trashList, newTrashChapter],
         });
       },
 
+      // 重置（清空所有小说数据）
       resetNovelList: () => {
         set({
-          novelList: [],
+          novels: [],
+          currentNovelId: null,
           currentChapterIndex: 0,
         });
       },
+
+      // 删除回收站章节
       deleteTrashChapter: (id: string) => {
         const { trashList } = get();
-        const filterTrashList = trashList.filter(c => c.id !== id);
-        set({ trashList: filterTrashList });
-      }
+        const filteredTrashList = trashList.filter(c => c.id !== id);
+        set({ trashList: filteredTrashList });
+      },
+
+      // 清空所有数据（包括回收站）
+      clearAll: () => {
+        set({
+          novels: [],
+          currentNovelId: null,
+          currentChapterIndex: 0,
+          trashList: [],
+        });
+      },
     }),
     {
-       //这个 Zustand store 使用了 persist 中间件，它的作用是：
-        // 初始化时：自动从 localStorage 的 novelList 键中读取数据并恢复状态
-        // 状态更新时（调用 set 后）：自动将最新状态保存到 localStorage
       name: 'novelList',
       storage: createJSONStorage(() => localStorage),
     }
