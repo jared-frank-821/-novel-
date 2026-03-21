@@ -87,7 +87,7 @@ export default function TextCompletionPage() {
   const [smartComplete, setSmartComplete] = useState(true);
   const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' |'categories'| null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
-  const [middleView, setMiddleView] = useState<'editor' | 'categories'>('editor');//控制中间区域显示什么
+  const [middleView, setMiddleView] = useState<'editor' | 'categories' |'novelinformation'>('editor');//控制中间区域显示什么
   const [coverUrl, setCoverUrl] = useState<string | null>(null);//封面图的 blob URL，渲染到 <img> 上
   const [isUploadingCover, setIsUploadingCover] = useState(false);//上传中的 loading 状态，用来禁用按钮和显示转圈图标
 
@@ -516,7 +516,7 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
             {/* 作品信息 - 当前小说 */}
             <button
               type="button"
-              onClick={() => setShowNovelSelector(true)}
+              onClick={() => setMiddleView('novelinformation')}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
             >
               <ChevronRight className="size-4" />
