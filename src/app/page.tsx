@@ -40,13 +40,6 @@ export default function Home() {
       icon: <List size={20} />,
       color: "bg-gradient-to-r from-blue-600 to-blue-700",
     },
-    {
-      title:"临时创作",
-      description:"试一下api能否连接",
-      href:"/try",
-      icon: <Edit size={20} />,
-      color:"bg-gradient-to-r from-blue-400 to-blue-500"
-    }
   ];
 
   return (
