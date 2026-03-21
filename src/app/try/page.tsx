@@ -48,13 +48,14 @@ import {
   X,
   FolderPlus,
   Image,
+  Tags,
 } from 'lucide-react';
 import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
 // import { Button } from "@/components/ui/button"
 import useNovelListStore from '@/store/useNovelListStore';
 import { saveImage,getImageUrl,deleteImage } from '@/store/useImageDB';
-
+import CategoriesContent from '@/components/CategoriesContent';
 export default function TextCompletionPage() {
   const {
     novels,
@@ -84,8 +85,9 @@ export default function TextCompletionPage() {
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [smartComplete, setSmartComplete] = useState(true);
-  const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' | null>('chapters');
+  const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' |'categories'| null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
+  const [middleView, setMiddleView] = useState<'editor' | 'categories'>('editor');//控制中间区域显示什么
   const [coverUrl, setCoverUrl] = useState<string | null>(null);//封面图的 blob URL，渲染到 <img> 上
   const [isUploadingCover, setIsUploadingCover] = useState(false);//上传中的 loading 状态，用来禁用按钮和显示转圈图标
 
@@ -327,6 +329,17 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
     } finally {
       setIsPolishing(false);
     }
+  };
+
+useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类界面，则切换到编辑器界面
+  if(leftOpen!=='categories'){
+    setMiddleView('editor')
+  }
+},[leftOpen])
+  // 切换中间面板显示分类界面
+  const handleNavigateToCategories = () => {
+    setLeftOpen('categories');
+    setMiddleView(middleView === 'categories' ? 'editor' : 'categories');
   };
 
   // 高亮颜色选项
@@ -601,6 +614,21 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
             </div>
             <button
               type="button"
+              onClick={handleNavigateToCategories}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-200 ${
+                middleView === 'categories' ? 'bg-gray-200 font-medium text-gray-900' : 'text-gray-600'
+              }`}
+            >
+              {middleView === 'categories' ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+              <Tags className="size-4" />
+              分类
+            </button>
+            <button
+              type="button"
               onClick={() => setLeftOpen(leftOpen === 'trash' ? null : 'trash')}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
             >
@@ -635,8 +663,15 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
           </nav>
         </aside>
 
-        {/* 中间编辑区 */}
+        {/* 中间编辑区 / 分类面板 */}
         <section className="flex-1 flex flex-col min-w-0">
+          {middleView === 'categories' ? (
+            /* 分类标签界面 */
+            <div className="flex-1 p-6 overflow-auto bg-gray-50">
+              <CategoriesContent compact />
+            </div>
+          ) : (
+            <>
           {/* 格式工具栏 */}
           <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-200 shrink-0">
             <button type="button" className="p-2 rounded hover:bg-gray-100" title="撤销"><Undo2 className="size-4" /></button>
@@ -842,6 +877,8 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
               </div>
             )}
           </div>
+            </>
+          )}
         </section>
 
         {/* 右侧 AI 助手 */}

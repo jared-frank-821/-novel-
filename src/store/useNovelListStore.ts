@@ -33,6 +33,7 @@ export interface Novel {
   createTime: string;
   updateTime: string;
   chapters: Chapter[];
+  selectedTags: string[];
 }
 
 type NovelListStore = {
@@ -47,6 +48,7 @@ type NovelListStore = {
   updateNovelCover:(id:string,coverId:string) => void;
   deleteNovel: (id: string) => void;
   selectNovel: (id: string) => void;
+  toggleTag:(tag:string) =>void;
 
   // 章节操作
   addChapter: (title?: string) => void;
@@ -87,6 +89,7 @@ const useNovelListStore = create<NovelListStore>()(
           createTime: now,
           updateTime: now,
           chapters: [],
+          selectedTags: [],
         };
         set({
           novels: [...novels, newNovel],
@@ -140,6 +143,20 @@ const useNovelListStore = create<NovelListStore>()(
           currentNovelId: id,
           currentChapterIndex: 0,
         });
+      },
+      //切换标签
+      toggleTag: (tag: string) => {
+        const { novels, currentNovelId } = get();
+        if (!currentNovelId) return;
+        const updatedNovels = novels.map(novel => {
+          if (novel.id !== currentNovelId) return novel;
+          const selectedTags = novel.selectedTags.includes(tag)
+            ? novel.selectedTags.filter(t => t !== tag)
+            : [...novel.selectedTags, tag];
+          return { ...novel, selectedTags };
+        });
+        console.log('[toggleTag] tag:', tag, '-> novels after:', JSON.stringify(updatedNovels.map(n => ({ id: n.id, selectedTags: n.selectedTags }))));
+        set({ novels: updatedNovels });
       },
 
       // 在当前小说中添加章节
@@ -335,9 +352,18 @@ const useNovelListStore = create<NovelListStore>()(
         const currentNovelId = p.currentNovelId === null || typeof p.currentNovelId === 'string'
           ? p.currentNovelId
           : currentState.currentNovelId;
+        const novels = Array.isArray(p.novels)
+          ? p.novels.map(novel => ({
+              ...novel,
+              selectedTags: Array.isArray((novel as Record<string, unknown>).selectedTags)
+                ? (novel as Record<string, unknown>).selectedTags as string[]
+                : [],
+            }))
+          : currentState.novels;
+        console.log('[merge] restored novels:', JSON.stringify(novels.map(n => ({ id: n.id, selectedTags: n.selectedTags }))));
         return {
           ...currentState,
-          novels: Array.isArray(p.novels) ? p.novels : currentState.novels,
+          novels,
           currentNovelId,
           currentChapterIndex: typeof p.currentChapterIndex === 'number' ? p.currentChapterIndex : currentState.currentChapterIndex,
           trashList: Array.isArray(p.trashList) ? p.trashList : currentState.trashList,
