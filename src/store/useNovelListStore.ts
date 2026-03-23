@@ -27,7 +27,6 @@ export interface Novel {
   title: string;
   author?: string;
   description?: string;
-  category?: string;
   status?: string;
   coverId?: string;//存 IndexedDB 的图片 ID
   createTime: string;
@@ -46,6 +45,7 @@ type NovelListStore = {
   addNovel: (title?: string) => void;
   updateNovel: (id: string, data: Partial<Novel>) => void;
   updateNovelCover:(id:string,coverId:string) => void;
+  writeNovelDescription: (id: string, description: string) => void;
   deleteNovel: (id: string) => void;
   selectNovel: (id: string) => void;
   toggleTag:(tag:string) =>void;
@@ -84,7 +84,7 @@ const useNovelListStore = create<NovelListStore>()(
           title: title || `新小说 ${novels.length + 1}`,
           author: '作者',
           description: '',
-          category: '未分类',
+          
           status: '连载中',
           createTime: now,
           updateTime: now,
@@ -117,6 +117,10 @@ const useNovelListStore = create<NovelListStore>()(
             : novel
         );
         set({ novels: updatedList });
+      },
+      // 写入小说简介
+      writeNovelDescription: (id: string, description: string) => {
+        get().updateNovel(id, { description });
       },
 
       // 删除小说

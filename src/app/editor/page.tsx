@@ -55,7 +55,8 @@ import { Toaster } from "@/components/ui/sonner";
 // import { Button } from "@/components/ui/button"
 import useNovelListStore from '@/store/useNovelListStore';
 import { saveImage,getImageUrl,deleteImage } from '@/store/useImageDB';
-import CategoriesContent from '@/components/CategoriesContent';
+import CategoriesContent from '@/components/categories/CategoriesContent';
+import InformationPage from '@/components/information/page';
 export default function TextCompletionPage() {
   const {
     novels,
@@ -85,7 +86,7 @@ export default function TextCompletionPage() {
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [smartComplete, setSmartComplete] = useState(true);
-  const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' |'categories'| null>('chapters');
+  const [leftOpen, setLeftOpen] = useState<'chapters' | 'trash' |'categories'|'information'| null>('chapters');
   const [rightTab, setRightTab] = useState<'ai' | 'inspiration'>('ai');
   const [middleView, setMiddleView] = useState<'editor' | 'categories' |'novelinformation'>('editor');//控制中间区域显示什么
   const [coverUrl, setCoverUrl] = useState<string | null>(null);//封面图的 blob URL，渲染到 <img> 上
@@ -332,7 +333,7 @@ const debounceRef = useRef<NodeJS.Timeout | null>(null);//创建一个 useRef �
   };
 
 useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类界面，则切换到编辑器界面
-  if(leftOpen!=='categories'){
+  if(leftOpen!=='categories' && leftOpen!=='information'){
     setMiddleView('editor')
   }
 },[leftOpen])
@@ -342,6 +343,11 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
     setMiddleView(middleView === 'categories' ? 'editor' : 'categories');
   };
 
+  // 切换中间面板显示小说信息界面
+  const handleNavigateToInformation = ()=>{
+    setLeftOpen('information');
+    setMiddleView(middleView ==='novelinformation' ? 'editor' : 'novelinformation');
+  }
   // 高亮颜色选项
   const highlightColors = [
     { name: '黄色', class: 'bg-yellow-200' },
@@ -516,10 +522,14 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
             {/* 作品信息 - 当前小说 */}
             <button
               type="button"
-              onClick={() => setMiddleView('novelinformation')}
+              onClick={handleNavigateToInformation}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-gray-600 hover:bg-gray-200"
             >
-              <ChevronRight className="size-4" />
+              {middleView === 'novelinformation' ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
               <FolderOpen className="size-4" />
               作品信息
             </button>
@@ -669,6 +679,11 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
             /* 分类标签界面 */
             <div className="flex-1 p-6 overflow-auto bg-gray-50">
               <CategoriesContent compact />
+            </div>
+          ) : middleView === 'novelinformation' ? (
+            /* 小说信息界面 */
+            <div className="flex-1 overflow-auto bg-gray-50">
+              <InformationPage compact />
             </div>
           ) : (
             <>
