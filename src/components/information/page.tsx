@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Book } from 'lucide-react';
 import useNovelListStore from '@/store/useNovelListStore';
-import { getImageUrl,saveImage } from '@/store/useImageDB';
+import { getImageUrl, saveImage } from '@/store/useImageDB';
 import { useRef } from 'react';
 import Link from 'next/link';
+import CategoriesContent from '@/components/categories/CategoriesContent';
 
 function formatWordCount(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)} 万字`;
@@ -96,7 +97,11 @@ export default function InformationPage({ compact =false}:informationContentProp
   const jumpToRead = (chapterIndex: number) => {
     selectChapter(chapterIndex);
   };
-
+  const finishNovel = () =>{
+    if(currentNovelId){
+      updateNovel(currentNovelId,{status:'已完结'});
+    }
+  }
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-5xl mx-auto px-4 pb-28 pt-6">
@@ -196,15 +201,6 @@ export default function InformationPage({ compact =false}:informationContentProp
                   <span className="rounded border border-amber-400/80 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
                     {currentNovel.status || '连载中'}
                   </span>
-                
-                  {(currentNovel.selectedTags ?? []).map(tag => (
-                    <span
-                      key={tag}
-                      className="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-600"
-                    >
-                      {tag}
-                    </span>
-                  ))}
                 </div>
 
                 <p className="mt-4 text-sm text-gray-700">总字数：{formatWordCount(currentNovelWordCount)}</p>
@@ -328,6 +324,11 @@ export default function InformationPage({ compact =false}:informationContentProp
                 )}
               </div>
             </div>
+
+            {/* 标签选择 */}
+            <div className="mt-6 rounded-xl border border-gray-200/80 bg-white shadow-sm overflow-hidden px-6 py-6 sm:px-8 sm:py-6">
+              <CategoriesContent />
+            </div>
           </>
         )}
       </div>
@@ -337,6 +338,7 @@ export default function InformationPage({ compact =false}:informationContentProp
         <div className="fixed bottom-6 right-6 z-20">
           <button
             type="button"
+            onClick={finishNovel}
             className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-black/15 transition-colors hover:bg-gray-800"
           >
             是否结束作品？

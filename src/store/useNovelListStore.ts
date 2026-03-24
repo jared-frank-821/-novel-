@@ -143,9 +143,12 @@ const useNovelListStore = create<NovelListStore>()(
 
       // 切换当前小说
       selectNovel: (id: string) => {
+        const { novels } = get();
+        const novel = novels.find(n => n.id === id);
+        const firstChapterIndex = novel && novel.chapters.length > 0 ? novel.chapters[0].index : 0;
         set({
           currentNovelId: id,
-          currentChapterIndex: 0,
+          currentChapterIndex: firstChapterIndex,  // ← 改成动态取第一章
         });
       },
       //切换标签
