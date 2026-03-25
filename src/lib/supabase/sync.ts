@@ -2,7 +2,7 @@
 
 import { createClient } from './client';
 import type { Novel, SyncState, SyncStatus } from './types';
-
+import { getImageBlob } from '@/store/useImageDB';
 export type SyncListener = (state: SyncState) => void;
 
 class SupabaseSyncService {
@@ -61,6 +61,16 @@ class SupabaseSyncService {
     this.setStatus('syncing');
 
     try {
+
+      // 收集所有小说中用到的、非空的 coverId，并行上传它们
+      const coverPromises = novels
+        .map(novel => novel.coverId)
+        .filter(Boolean) // 过滤掉空值
+        .map(coverId => this.uploadCoverIfNeed(coverId as string));
+      
+      // 等待所有用到的封面上传完毕（如果图片多，这里也可以不加 await 让它在后台慢慢传，看你需求）
+      await Promise.all(coverPromises);
+
       const payload = novels.map(novel => ({
         user_id: this.userId, // 从 localStorage 拿/生成的匿名 ID
         novel_id: novel.id, // 小说 UUID
@@ -127,6 +137,36 @@ class SupabaseSyncService {
     }
   }
 
+  // 新增：上传封面到 Supabase Storage
+  async uploadCoverIfNeed(coverId: string): Promise<void> {
+    if (!coverId) return;
+
+    try {
+      // 1. 从 IndexedDB 提取实际图片文件
+      const fileBlob = await getImageBlob(coverId);
+      if (!fileBlob) return; // 如果本地没有这个图片，直接跳过
+
+      // 2. 构造文件路径：用 用户ID/封面ID 作为路径，避免不同用户的文件冲突
+      const filePath = `${this.userId}/${coverId}`;
+
+      // 3. 上传到 cover 存储桶
+      console.log(`[SupabaseSync] Uploading cover ${coverId} to bucket 'cover'`);
+      const { error } = await this.supabase.storage
+        .from('cover')
+        .upload(filePath, fileBlob, {
+          upsert: true, // 关键：如果已经存在同名文件，则覆盖更新
+          contentType: fileBlob.type // 保持图片原来的格式
+        });
+
+      if (error) {
+        console.error('[SupabaseSync] Cover upload failed:', error.message);
+      } else {
+        console.log(`[SupabaseSync] Cover ${coverId} uploaded successfully.`);
+      }
+    } catch (err) {
+      console.error('[SupabaseSync] uploadCoverIfNeed error:', err);
+    }
+  }
   async deleteNovel(novelId: string): Promise<void> {
     try {
       const { error } = await this.supabase

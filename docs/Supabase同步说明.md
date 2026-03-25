@@ -215,3 +215,87 @@ SELECT * FROM novels;
 
 ### Q: 能否不用 Supabase？
 - 可以。同步逻辑独立于业务逻辑，数据仍然保存在 localStorage。删除 Supabase 相关代码后应用正常运行。
+
+---
+
+## 9. 封面图片云同步
+
+### 9.1 功能说明
+
+封面图片现在也会同步到 Supabase Storage，确保换设备或清除浏览器数据后封面不会丢失。
+
+### 9.2 Supabase Storage 配置
+
+在 Supabase Dashboard 中创建 Storage bucket：
+
+1. 进入 **Supabase Dashboard** → **Storage**
+2. 点击 **New bucket**
+3. 配置如下：
+
+| 配置项 | 值 |
+|--------|-----|
+| Name | `cover` |
+| Public | ✅ 勾选 (Public bucket) |
+| Allowed file types | Images only |
+| Max file size | 10MB |
+
+4. 点击 **Create bucket**
+
+### 9.3 RLS 策略配置
+
+在 **Storage** → **Policies** 中添加以下策略（使用 SQL Editor）：
+
+```sql
+-- 允许所有用户上传、读取、删除自己的封面
+CREATE POLICY "Allow all operations on covers"
+ON storage.objects
+FOR ALL
+USING (auth.uid() IS NOT NULL OR true)
+WITH CHECK (true);
+
+-- 或者更宽松的策略（适合个人项目）
+CREATE POLICY "Public bucket access"
+ON storage.objects
+FOR ALL
+USING (bucket_id = 'cover')
+WITH CHECK (bucket_id = 'cover');
+```
+
+> 如果使用匿名用户（当前项目使用 localStorage 生成 user_id），建议在 Storage Policies 中临时允许公开访问，或者使用 Service Role Key（注意安全风险）。
+
+### 9.4 封面存储路径
+
+封面按用户 ID 分文件夹存储：
+
+```
+covers/
+└── user_xxx/
+    ├── 1234567890-abc123.jpg
+    └── 9876543210-xyz789.png
+```
+
+### 9.5 新增文件
+
+| 文件路径 | 作用 |
+|----------|------|
+| `src/lib/supabase/coverStorage.ts` | 封面云存储服务 |
+| `src/store/useImageDB.ts` | 已更新，新增云端同步功能 |
+
+### 9.6 API 说明
+
+```typescript
+import { coverStorage } from '@/lib/supabase/coverStorage';
+
+// 上传封面
+const result = await coverStorage.uploadCover(file, coverId);
+
+// 获取云端封面 URL
+const url = await coverStorage.getPublicUrl(coverId);
+
+// 删除封面
+await coverStorage.deleteCover(coverId);
+
+// 批量同步云端封面到本地（初始化时使用）
+import { syncAllCoversFromCloud } from '@/store/useImageDB';
+await syncAllCoversFromCloud(coverIds);
+```
