@@ -54,6 +54,7 @@ import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
 // import { Button } from "@/components/ui/button"
 import useNovelListStore from '@/store/useNovelListStore';
+import { SyncStatusIndicator } from '@/components/SyncStatusIndicator';
 import { saveImage,getImageUrl,deleteImage } from '@/store/useImageDB';
 import CategoriesContent from '@/components/categories/CategoriesContent';
 import InformationPage from '@/components/information/page';
@@ -415,7 +416,7 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
           <button type="button" className="flex items-center gap-1 text-gray-600 hover:text-gray-900">
             <ArrowLeft className="size-4" /> 退出
           </button>
-          <span className="text-sm text-gray-500">已保存到云端</span>
+          <span className="text-sm text-gray-500"><SyncStatusIndicator /></span>
 
           {/* 小说选择器 */}
           <div className="relative novel-selector">

@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { supabaseSync } from "@/lib/supabase";
+import type { SyncState } from "@/lib/supabase/types";
 
 export interface Chapter {
   id: string;
@@ -40,6 +42,8 @@ type NovelListStore = {
   currentNovelId: string | null;
   currentChapterIndex: number;
   trashList: TrashChapter[];
+  syncState: SyncState;//存储云端同步状态
+  isInitialized: boolean;//存储是否初始化
 
   // 小说操作
   addNovel: (title?: string) => void;
@@ -62,10 +66,21 @@ type NovelListStore = {
   deleteTrashChapter: (id: string) => void;
   // 清空所有数据
   clearAll: () => void;
+  // 同步操作
+  initSync: () => Promise<void>;
+  forceSync: () => Promise<void>;
+  subscribeSync: () => () => void;
 }
 
 // 工具函数：生成唯一ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// 触发同步的辅助函数
+const triggerSync = (novels: Novel[]) => {//这是一个防抖触发器。只要调用就相当于告诉supbase数据变了，等2秒看有没有改动，没有就上传
+  if (typeof window !== 'undefined') {//确保只在浏览器环境下执行，避免ssr（服务端渲染）时报错
+    supabaseSync.debouncedSync(novels);//调用防抖函数，2秒后上传
+  }
+};
 
 const useNovelListStore = create<NovelListStore>()(
   persist(
@@ -74,6 +89,13 @@ const useNovelListStore = create<NovelListStore>()(
       currentNovelId: null,
       currentChapterIndex: 0,
       trashList: [],
+      syncState: {
+        status: 'idle',
+        lastSyncTime: null,
+        error: null,
+        pendingChanges: 0,
+      },
+      isInitialized: false,
 
       // 添加新小说
       addNovel: (title?: string) => {
@@ -96,6 +118,7 @@ const useNovelListStore = create<NovelListStore>()(
           currentNovelId: newNovel.id,
           currentChapterIndex: 0,
         });
+        triggerSync([...novels, newNovel]);
       },
 
       // 更新小说信息
@@ -107,6 +130,7 @@ const useNovelListStore = create<NovelListStore>()(
             : novel//否则保持原样
         );
         set({ novels: updatedList });//更新小说列表
+        triggerSync(updatedList);
       },
       //更新小说封面
       updateNovelCover: async (id: string, coverId: string) => {
@@ -117,6 +141,7 @@ const useNovelListStore = create<NovelListStore>()(
             : novel
         );
         set({ novels: updatedList });
+        triggerSync(updatedList);
       },
       // 写入小说简介
       writeNovelDescription: (id: string, description: string) => {
@@ -139,6 +164,7 @@ const useNovelListStore = create<NovelListStore>()(
           currentNovelId: newCurrentId,
           currentChapterIndex: 0,
         });
+        triggerSync(filteredList);
       },
 
       // 切换当前小说
@@ -164,6 +190,7 @@ const useNovelListStore = create<NovelListStore>()(
         });
         console.log('[toggleTag] tag:', tag, '-> novels after:', JSON.stringify(updatedNovels.map(n => ({ id: n.id, selectedTags: n.selectedTags }))));
         set({ novels: updatedNovels });
+        triggerSync(updatedNovels);
       },
 
       // 在当前小说中添加章节
@@ -202,6 +229,7 @@ const useNovelListStore = create<NovelListStore>()(
           novels: updatedNovels,
           currentChapterIndex: newIndex,
         });
+        triggerSync(updatedNovels);
       },
 
       // 更新章节内容
@@ -231,6 +259,7 @@ const useNovelListStore = create<NovelListStore>()(
         };
 
         set({ novels: updatedNovels });
+        triggerSync(updatedNovels);
       },
 
       // 更新章节信息
@@ -255,6 +284,7 @@ const useNovelListStore = create<NovelListStore>()(
         };
 
         set({ novels: updatedNovels });
+        triggerSync(updatedNovels);
       },
 
       // 选择章节
@@ -314,6 +344,7 @@ const useNovelListStore = create<NovelListStore>()(
           currentChapterIndex: newCurrentIndex,
           trashList: [...trashList, newTrashChapter],
         });
+        triggerSync(updatedNovels);
       },
 
       // 重置（清空所有小说数据）
@@ -339,6 +370,32 @@ const useNovelListStore = create<NovelListStore>()(
           currentNovelId: null,
           currentChapterIndex: 0,
           trashList: [],
+        });
+        supabaseSync.uploadNovels([]);
+      },
+
+      // 初始化同步
+      initSync: async () => {//首次进入编辑器时，拉取云端数据并与本地合并
+        if (typeof window === 'undefined') return;
+        const syncedNovels = await supabaseSync.init();
+        if (syncedNovels) {
+          set({ novels: syncedNovels, isInitialized: true });
+        } else {
+          set({ isInitialized: true });
+        }
+      },
+
+      // 强制同步
+      forceSync: async () => {
+        if (typeof window === 'undefined') return;
+        await supabaseSync.uploadNovels(get().novels);
+      },
+
+      // 订阅同步状态
+      subscribeSync: () => {
+        if (typeof window === 'undefined') return () => {};
+        return supabaseSync.subscribe((state) => {
+          set({ syncState: state });
         });
       },
     }),
@@ -374,6 +431,7 @@ const useNovelListStore = create<NovelListStore>()(
           currentNovelId,
           currentChapterIndex: typeof p.currentChapterIndex === 'number' ? p.currentChapterIndex : currentState.currentChapterIndex,
           trashList: Array.isArray(p.trashList) ? p.trashList : currentState.trashList,
+          isInitialized: Array.isArray(p.novels) ? true : currentState.isInitialized,
         };
       },
     }
