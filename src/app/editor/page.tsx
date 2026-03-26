@@ -54,6 +54,7 @@ import { toast } from "sonner"
 import { Toaster } from "@/components/ui/sonner";
 // import { Button } from "@/components/ui/button"
 import useNovelListStore from '@/store/useNovelListStore';
+import { getNovelListStorageKey } from '@/store/novelListPersistUser';
 import { SyncStatusIndicator } from '@/components/SyncStatusIndicator';
 import { saveImage,getImageUrl,deleteImage } from '@/store/useImageDB';
 import CategoriesContent from '@/components/categories/CategoriesContent';
@@ -361,7 +362,7 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
 
   // 导出数据为 JSON 文件
   const exportToJson = () => {
-    const data = localStorage.getItem('novelList');
+    const data = localStorage.getItem(getNovelListStorageKey());
     const blob = new Blob([data || '{}'], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -387,8 +388,8 @@ useEffect(()=>{//当左侧栏的打开状态变化时，如果当前不是分类
           throw new Error('无效的备份文件');
         }
 
-        // 恢复数据到 localStorage
-        localStorage.setItem('novelList', JSON.stringify(data));
+        // 恢复数据到当前用户分区的 localStorage
+        localStorage.setItem(getNovelListStorageKey(), JSON.stringify(data));
 
         toast.success('导入成功！即将刷新页面...');
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./_components/Navbar";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,16 +30,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-linear-to-b from-blue-50 to-white min-h-screen`}
       >
-        <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          {children}
-        </main>
-        <footer className="bg-linear-to-r from-blue-600 to-blue-800 text-white py-6 mt-12">
-          <div className="container mx-auto px-4 text-center">
-            <p className="text-blue-100">© 2026 My Novel - 小说创作平台</p>
-            <p className="text-blue-200 text-sm mt-2">用技术赋能创作，让故事更精彩</p>
-          </div>
-        </footer>
+        <AuthProvider>
+          <Navbar />
+          <main className="container mx-auto px-4 py-8">
+            {children}
+          </main>
+          <footer className="bg-linear-to-r from-blue-600 to-blue-800 text-white py-6 mt-12">
+            <div className="container mx-auto px-4 text-center">
+              <p className="text-blue-100">© 2026 My Novel - 小说创作平台</p>
+              <p className="text-blue-200 text-sm mt-2">用技术赋能创作，让故事更精彩</p>
+            </div>
+          </footer>
+        </AuthProvider>
       </body>
     </html>
   );

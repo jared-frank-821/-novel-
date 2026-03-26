@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { supabaseSync } from "@/lib/supabase";
 import type { SyncState } from "@/lib/supabase/types";
+import {
+  createNovelListPartitionedStorage,
+} from "@/store/novelListPersistUser";
 
 export interface Chapter {
   id: string;
@@ -377,6 +380,8 @@ const useNovelListStore = create<NovelListStore>()(
       // 初始化同步
       initSync: async () => {//首次进入编辑器时，拉取云端数据并与本地合并
         if (typeof window === 'undefined') return;
+        // 先按当前登录用户从分区 localStorage 恢复，再与云端合并（避免与 persist 竞态）
+        await useNovelListStore.persist.rehydrate();
         const syncedNovels = await supabaseSync.init();
         if (syncedNovels) {
           set({ novels: syncedNovels, isInitialized: true });
@@ -401,7 +406,12 @@ const useNovelListStore = create<NovelListStore>()(
     }),
     {
       name: 'novelList',
-      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+      storage: createJSONStorage(() =>
+        typeof window === 'undefined'
+          ? (undefined as unknown as Storage)
+          : (createNovelListPartitionedStorage() as unknown as Storage)
+      ),
       // 只持久化这 4 个字段，避免写入旧版遗留的 novelList 等
       partialize: (state) => ({
         novels: state.novels,

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import useNovelListStore from '@/store/useNovelListStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { Cloud, CloudOff, Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface SyncStatusIndicatorProps {
@@ -10,14 +11,16 @@ interface SyncStatusIndicatorProps {
 
 export function SyncStatusIndicator({ className = '' }: SyncStatusIndicatorProps) {
   const { syncState, isInitialized, initSync, forceSync, subscribeSync } = useNovelListStore();
+  const { isLoading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!isInitialized) {
       initSync();
     }
     const unsubscribe = subscribeSync();
     return unsubscribe;
-  }, [isInitialized, initSync, subscribeSync]);
+  }, [authLoading, isInitialized, initSync, subscribeSync]);
 
   const getStatusIcon = () => {
     switch (syncState.status) {

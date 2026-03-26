@@ -3,12 +3,13 @@
 import { createClient } from './client';
 import type { Novel, SyncState, SyncStatus } from './types';
 import { getImageBlob } from '@/store/useImageDB';
+import { readPersistedNovelsFromLocalStorage } from '@/store/novelListPersistUser';
 export type SyncListener = (state: SyncState) => void;
 
 class SupabaseSyncService {
   private supabase = createClient();
   private listeners: Set<SyncListener> = new Set();
-  private userId: string;
+  private userId: string | null = null;
   private syncState: SyncState = {
     status: 'idle',
     lastSyncTime: null,
@@ -17,19 +18,35 @@ class SupabaseSyncService {
   };
   private syncTimeout: NodeJS.Timeout | null = null;
   private debounceDelay = 2000;
+  private isUnsubscribing = false;
+  private authStateChangedReady = false;
 
   constructor() {
-    this.userId = this.getUserId();
+    this.initAuthListener();
   }
 
-  private getUserId(): string {
-    if (typeof window === 'undefined') return 'anonymous';
-    let id = localStorage.getItem('sb_user_id');
-    if (!id) {
-      id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      localStorage.setItem('sb_user_id', id);
+  // 监听 Auth 状态变化，userId 始终保持与登录态同步
+  private async initAuthListener() {
+    // 首次加载时尝试获取已登录用户
+    const { data: sessionData } = await this.supabase.auth.getSession();
+    if (sessionData?.session?.user) {
+      this.userId = sessionData.session.user.id;
     }
-    return id;
+
+    // 持续监听后续的登录/登出事件
+    const { data: { subscription } } = this.supabase.auth.onAuthStateChange((_event, session) => {
+      if (this.isUnsubscribing) return;
+      this.userId = session?.user?.id ?? null;
+    });
+
+    this.authStateChangedReady = true;
+  }
+
+  private ensureUserId(): string {
+    if (!this.userId) {
+      throw new Error('用户未登录，无法同步');
+    }
+    return this.userId;
   }
 
   private updateState(updates: Partial<SyncState>) {
@@ -58,21 +75,26 @@ class SupabaseSyncService {
   async uploadNovels(novels: Novel[]): Promise<void> {
     if (!novels || novels.length === 0) return;
 
+    const userId = this.userId;
+    if (!userId) {
+      console.warn('[SupabaseSync] 未登录，跳过上传');
+      return;
+    }
+
     this.setStatus('syncing');
 
     try {
-
       // 收集所有小说中用到的、非空的 coverId，并行上传它们
       const coverPromises = novels
         .map(novel => novel.coverId)
         .filter(Boolean) // 过滤掉空值
-        .map(coverId => this.uploadCoverIfNeed(coverId as string));
-      
-      // 等待所有用到的封面上传完毕（如果图片多，这里也可以不加 await 让它在后台慢慢传，看你需求）
+        .map(coverId => this.uploadCoverIfNeed(coverId as string, userId));
+
+      // 等待所有用到的封面上传完毕
       await Promise.all(coverPromises);
 
       const payload = novels.map(novel => ({
-        user_id: this.userId, // 从 localStorage 拿/生成的匿名 ID
+        user_id: userId, // 真实 UUID
         novel_id: novel.id, // 小说 UUID
         title: novel.title,
         author: novel.author || '',
@@ -85,11 +107,16 @@ class SupabaseSyncService {
         selected_tags: novel.selectedTags,
       }));
 
-      const { error } = await this.supabase
+      console.log('[SupabaseSync] uploadNovels 上传 payload，user_id:', userId, 'novels数量:', novels.length);
+
+      const { data, error } = await this.supabase
         .from('novels')
         .upsert(payload, { onConflict: 'user_id,novel_id' });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[SupabaseSync] uploadNovels 详细错误:', JSON.stringify(error, null, 2));
+        throw new Error(error.message || '上传失败');
+      }
 
       this.setStatus('success');
     } catch (err) {
@@ -99,13 +126,17 @@ class SupabaseSyncService {
   }
 
   async fetchNovels(): Promise<Novel[] | null> {
+    const userId = this.userId;
+    if (!userId) return null;
+
     this.setStatus('syncing');
 
     try {
+      console.log('[SupabaseSync] fetchNovels 当前 user_id:', this.userId);
       const { data, error } = await this.supabase
         .from('novels')
         .select('*')
-        .eq('user_id', this.userId)
+        .eq('user_id', userId)
         .order('update_time', { ascending: false });
 
       if (error) throw error;
@@ -137,25 +168,37 @@ class SupabaseSyncService {
     }
   }
 
-  // 新增：上传封面到 Supabase Storage
-  async uploadCoverIfNeed(coverId: string): Promise<void> {
+  // 上传封面到 Supabase Storage
+  async uploadCoverIfNeed(coverId: string, userId?: string): Promise<void> {
     if (!coverId) return;
+
+    const uid = userId ?? this.userId;
+    if (!uid) return; // 未登录不传封面
 
     try {
       // 1. 从 IndexedDB 提取实际图片文件
       const fileBlob = await getImageBlob(coverId);
-      if (!fileBlob) return; // 如果本地没有这个图片，直接跳过
+      if (!fileBlob) return; // 本地没有这个图片，跳过
 
-      // 2. 构造文件路径：用 用户ID/封面ID 作为路径，避免不同用户的文件冲突
-      const filePath = `${this.userId}/${coverId}`;
+      // 2. 构造文件路径
+      const mimeToExt = (mime: string) => {
+        const map: Record<string, string> = {
+          'image/jpeg': 'jpg', 'image/png': 'png',
+          'image/gif': 'gif', 'image/webp': 'webp',
+          'image/avif': 'avif',
+        };
+        return map[mime] || 'jpg';
+      };
+      const fileExt = mimeToExt(fileBlob.type);
+      const filePath = `${uid}/${coverId}.${fileExt}`;
 
       // 3. 上传到 cover 存储桶
       console.log(`[SupabaseSync] Uploading cover ${coverId} to bucket 'cover'`);
       const { error } = await this.supabase.storage
         .from('cover')
         .upload(filePath, fileBlob, {
-          upsert: true, // 关键：如果已经存在同名文件，则覆盖更新
-          contentType: fileBlob.type // 保持图片原来的格式
+          upsert: true,
+          contentType: fileBlob.type
         });
 
       if (error) {
@@ -167,12 +210,16 @@ class SupabaseSyncService {
       console.error('[SupabaseSync] uploadCoverIfNeed error:', err);
     }
   }
+
   async deleteNovel(novelId: string): Promise<void> {
+    const userId = this.userId;
+    if (!userId) return;
+
     try {
       const { error } = await this.supabase
         .from('novels')
         .delete()
-        .eq('user_id', this.userId)
+        .eq('user_id', userId)
         .eq('novel_id', novelId);
 
       if (error) throw error;
@@ -183,18 +230,23 @@ class SupabaseSyncService {
 
   debouncedSync(novels: Novel[]) {
     if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);// 清除上一次的定时器
+      clearTimeout(this.syncTimeout);
     }
     this.updateState({ pendingChanges: this.syncState.pendingChanges + 1 });
     this.syncTimeout = setTimeout(() => {
-      this.uploadNovels(novels);// 2秒后才真正上传
+      this.uploadNovels(novels);
     }, this.debounceDelay);
   }
 
   async init(): Promise<Novel[] | null> {
-    const localData = localStorage.getItem('novelList');
-    const localNovels: { state?: { novels?: Novel[] } } = localData ? JSON.parse(localData) : {};
-    const hasLocal = localNovels?.state?.novels && localNovels.state.novels.length > 0;
+    const localList = readPersistedNovelsFromLocalStorage() as Novel[] | null;
+    const localNovels = localList?.length ? localList : null;
+    const hasLocal = !!localNovels?.length;
+
+    const userId = this.userId;
+    if (!userId) {
+      return localNovels;
+    }
 
     const cloudNovels = await this.fetchNovels();
     const hasCloud = cloudNovels && cloudNovels.length > 0;
@@ -204,15 +256,16 @@ class SupabaseSyncService {
     }
 
     if (hasLocal && !hasCloud) {
-      await this.uploadNovels(localNovels.state!.novels!);
-      return localNovels.state!.novels!;
+      // 新用户没有云端数据，直接返回本地，不触发 upsert（避免 RLS 冲突）
+      console.log('[SupabaseSync] init: 新用户无云端数据，直接使用本地数据');
+      return localNovels!;
     }
 
     if (!hasLocal && hasCloud) {
       return cloudNovels;
     }
 
-    const local = localNovels.state!.novels!;
+    const local = localNovels!;
     const cloud = cloudNovels!;
 
     const merged = this.mergeNovels(local, cloud);
@@ -245,6 +298,16 @@ class SupabaseSyncService {
 
   getState(): SyncState {
     return this.syncState;
+  }
+
+  // 登出时清理资源
+  destroy() {
+    this.isUnsubscribing = true;
+    this.listeners.clear();
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
+    }
   }
 }
 
