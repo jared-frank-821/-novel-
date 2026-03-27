@@ -7,6 +7,7 @@ import {
   migrateLegacyNovelListToUser,
   setNovelListPersistUserId,
 } from '@/store/novelListPersistUser'
+import { setCoverStorageUserId } from '@/lib/supabase/coverStorage'
 import useNovelListStore from '@/store/useNovelListStore'
 
 interface AuthContextType {
@@ -25,54 +26,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const lastPersistUid = useRef<string | null | undefined>(undefined)
 
+  // 清空内存态（切换账号时必须同步执行，防止短暂显示上一用户数据）
+  const clearStoreState = () => {
+    useNovelListStore.setState({
+      novels: [],
+      currentNovelId: null,
+      currentChapterIndex: 0,
+      trashList: [],
+      isInitialized: false,
+      syncState: {
+        status: 'idle',
+        lastSyncTime: null,
+        error: null,
+        pendingChanges: 0,
+      },
+    })
+  }
+
   useEffect(() => {
     // 获取初始 session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      // 初始化 persistUserId，确保首次加载时 localStorage 键就正确
+      const uid = session?.user?.id ?? null
+      lastPersistUid.current = uid
+      setNovelListPersistUserId(uid)
+      setCoverStorageUserId(uid)
+      if (uid) migrateLegacyNovelListToUser(uid)
       setIsLoading(false)
     })
 
-    // 监听 auth 状态变化
+    // 监听 auth 状态变化 — 必须在这里同步更新 persistUserId，
+    // 否则在 OAuth 回调等场景下，supabaseSync.userId 已变但 localStorage 键仍是旧用户的。
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+
+      const prev = lastPersistUid.current
+      if (prev === uid) return
+      lastPersistUid.current = uid
+
+      // 切换账号时必须立即清空内存态并切换 localStorage 键
+      if (prev !== undefined && prev !== uid) {
+        clearStoreState()
+      }
+
+      setNovelListPersistUserId(uid)
+      setCoverStorageUserId(uid)
+      if (uid) migrateLegacyNovelListToUser(uid)
     })
 
     return () => subscription.unsubscribe()
   }, [supabase.auth])
-
-  // 登录用户变化时切换 novelList 的 localStorage 分区（rehydrate 在 initSync 里执行）
-  useEffect(() => {
-    if (isLoading) return
-    const uid = session?.user?.id ?? null
-    const prev = lastPersistUid.current
-    if (prev === uid) return
-    lastPersistUid.current = uid
-
-    // 切换账号时先清空内存态，避免短暂显示上一用户的小说
-    if (prev !== undefined && prev !== uid) {
-      useNovelListStore.setState({
-        novels: [],
-        currentNovelId: null,
-        currentChapterIndex: 0,
-        trashList: [],
-        isInitialized: false,
-        syncState: {
-          status: 'idle',
-          lastSyncTime: null,
-          error: null,
-          pendingChanges: 0,
-        },
-      })
-    }
-
-    if (uid) migrateLegacyNovelListToUser(uid)
-    setNovelListPersistUserId(uid)
-  }, [session?.user?.id, isLoading])
 
   const signOut = async () => {
     await supabase.auth.signOut()

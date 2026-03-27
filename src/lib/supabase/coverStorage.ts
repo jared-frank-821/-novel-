@@ -1,19 +1,20 @@
 import { createClient } from './client';
 
 const BUCKET_NAME = 'cover';
-const COVERS_FOLDER = 'covers';
+
+/** 缓存当前登录用户的真实 UUID（由外部在 auth 状态变化时注入） */
+let cachedUserId: string | null = null;
+
+export function setCoverStorageUserId(uid: string | null): void {
+  cachedUserId = uid;
+}
 
 class CoverStorageService {
   private supabase = createClient();
 
+  /** 使用缓存的用户 ID，未登录时降级为匿名 */
   private getUserId(): string {
-    if (typeof window === 'undefined') return 'anonymous';
-    let id = localStorage.getItem('sb_user_id');
-    if (!id) {
-      id = `user_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      localStorage.setItem('sb_user_id', id);
-    }
-    return id;
+    return cachedUserId ?? '__anonymous__';
   }
 
   private getStoragePath(coverId: string): string {
